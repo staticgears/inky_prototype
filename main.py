@@ -87,12 +87,12 @@ def hardware_init():
 # Logging #
 ###########
 def log_warning(msg):
-    """ Abstract warning logging incase we get fancer with LED incators, email, or unified logger
+    """ Abstract warning logging incase we get fancier with LED incators, email, or unified logger """
     print(msg)
     write_text(msg, error=False)
 
 def log_error(msg):
-    """ Abstract error logging incase we get fancer with LED incators, email, or unified logger
+    """ Abstract error logging incase we get fancier with LED incators, email, or unified logger """
     print(msg)
     write_text(msg, error=True)
 
@@ -104,7 +104,7 @@ def _get_image_path(filename):
 
 def check_existence_of_image(filename):
     path = _get_image_path(filename)
-    return os.path.exists(path):
+    return os.path.exists(path)
     
 def list_images():
     return os.listdir(IMAGES_DIR)
@@ -127,7 +127,7 @@ def delete_sd_files_with_filter(names_filter_set):
             delete_image(filename) 
 
 def write_text(msg, error):
-    if g_graphics;
+    if g_graphics:
       WIDTH, HEIGHT = g_graphics.get_bounds()
       g_graphics.set_font("bitmap8")
       g_graphics.set_pen(inky_frame.WHITE)
@@ -168,7 +168,7 @@ def display_image_by_time():
        monthly_hour_epoc = 0 
     elif hours > HOUR_UPPER_BOUND:
        monthly_hour_epoc = HOUR_UPPER_BOUND
-    else
+    else:
        monthly_hour_epoc = hours
 
     if days > 0:
@@ -178,8 +178,8 @@ def display_image_by_time():
        log_warning("No images to display")
        return
     idx = (monthly_hour_epoc + g_idx_offset) % len(available_images)
-    filename = available_images sorted_paths[idx]
-    _display_jpeg(filename):
+    filename = sorted_paths[idx]
+    _display_jpeg(filename)
     
 def download_image(filename, url):
     path = _get_image_path(filename)
@@ -214,7 +214,7 @@ def download_image(filename, url):
 ############
 # JSON Map #  
 ############
-def load_json_body():
+def load_json_body(url):
     """
        Load a json file that indicates which images need to be deleted / downloaded
        Format is a json list with this structure, all fields are required.
@@ -247,7 +247,7 @@ def process_json_body(json_body):
 
    active_name_set = {item['name'] for item in json_body if 'name' in item}
    # Step 1: Delete files on SD card not listed in the map
-   delete_sd_files_with_filter(active_names):
+   delete_sd_files_with_filter(active_names)
 
    for img_entry in json_body:
        name = img_entry['name']
@@ -295,7 +295,7 @@ def main_loop():
     reset_all_leds()
     cycle_all_leds()
 
-    While True:
+    while True:
         # Step 0: Handle Buttons 
         if inky_frame.button_a.read():
             # Increment to the next picture
@@ -316,7 +316,7 @@ def main_loop():
             delete_sd_files_with_filter(set())
 
         # Step 1: Cleanup old images and add new ones
-        json_body = load_json_body() 
+        json_body = load_json_body(JSON_MAP_URL)
         process_json_body(json_body)
 
         # Step 2: Select which image to display
@@ -326,3 +326,7 @@ def main_loop():
         inky_frame.sleep_for(PERIOD_IN_MINUTES)
         #turn_off() shouldn't be necessary as the docs claim sleep_for handles this
         #inky_frame.turn_off()  
+
+
+if __name__ == "__main__":
+    main_loop()
