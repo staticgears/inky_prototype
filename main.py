@@ -3,17 +3,28 @@ import inky_frame
 import jpegdec
 from machine import RTC
 
+def mount_sd():
+    # Limit scope of imports for memory health
+    from machine import SPI, Pin
+    if SPI:
+        import sdcard
+        # set up the SD card
+        sd_spi = SPI(0, sck=Pin(18, Pin.OUT), mosi=Pin(19, Pin.OUT), miso=Pin(16, Pin.OUT))
+        sd = sdcard.SDCard(sd_spi, Pin(22))
+        os.mount(sd, "/" + SD_MOUNT)
+    
 #############
 # Constants #
 #############
-cfg_path = "config.ini"
+SD_MOUNT = 'sd' 
+mount_sd()
+cfg_path =  os.path.join(SD_MOUNT, 'config.ini')
 config = configparser.ConfigParser()
 config.read(cfg_path)
 WIFI_SSID = config['wifi']['ssid']
 WIFI_PASSWORD = config['wifi']['password'] 
 JSON_MAP_URL = config['misc']['json_map_url'] 
 CHUNK_SIZE=config.getint('misc', 'chunk_size')
-SD_MOUNT = config['misc']['sd_mount'] 
 IMAGES_DIR = os.path.join(SD_MOUNT, config['misc']['images_dir'])
 PERIOD_IN_MINUTES = config.getint('time', 'period_in_minutes')
 HOUR_LOWER_BOUND=config.getint('time', 'hour_lower_bound')
@@ -47,11 +58,11 @@ def wifi_connect(disconnect):
         inky_helper.network_connect(WIFI_SSID, WIFI_PASSWORD)
     except ImportError:
         log_error("Failure to connect to wifi")
-    
+
 def hardware_init():
+    os.makedirs(IMAGES_DIR, exist_ok=True)
+
     # Limit scope of imports for memory health
-    from machine import SPI, Pin
-    import sdcard
     # from picographics import DISPLAY_INKY_FRAME_4 as DISPLAY  # 4.0"
     # from picographics import DISPLAY_INKY_FRAME as DISPLAY    # 5.7"
     # from picographics import DISPLAY_INKY_FRAME_7 as DISPLAY  # 7.3"
@@ -73,12 +84,6 @@ def hardware_init():
     i2c = PimoroniI2C(I2C_SDA_PIN, I2C_SCL_PIN, 100000)
     rtc = PCF85063A(i2c)
     rtc.enable_timer_interrupt(True)
-
-    # set up the SD card
-    sd_spi = SPI(0, sck=Pin(18, Pin.OUT), mosi=Pin(19, Pin.OUT), miso=Pin(16, Pin.OUT))
-    sd = sdcard.SDCard(sd_spi, Pin(22))
-    os.mount(sd, "/" + SD_MOUNT)
-    os.makedirs(IMAGES_DIR, exist_ok=True)
 
     # Connect to WiFi
     wifi_connect(disconnect=False)

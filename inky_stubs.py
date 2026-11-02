@@ -48,6 +48,8 @@ sys.modules["inky_frame"] = mock_inky_frame
 
 mock_machine = ModuleType("machine")
 mock_machine.RTC = MockRTC
+mock_machine.SPI = None 
+mock_machine.Pin = None 
 sys.modules["machine"] = mock_machine
 
 mock_jpegdec = ModuleType("jpegdec")
