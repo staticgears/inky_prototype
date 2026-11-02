@@ -32,6 +32,7 @@
 1. Make a copy of exmaple_config.ini `cp example_config.ini config.ini` and fill in at least json_map_url
 1. Uncomment the inky_stubs import in main.py and then tailor the `if __name__ == "__main__":` portion as you like.
 
+NOTE: If you commit main.py with the inky_stubs uncommented nothing will work on the device, you've been warned
 
 ### Python venv
 ```
