@@ -1,7 +1,10 @@
+# Uncomment the next line to test on PC without access to the Inky modules
+#import inky_stubs
+
 import configparser, gc, json, os, random, requests, time
 import inky_frame
 import jpegdec
-
+from machine import RTC
 
 #############
 # Constants #
@@ -12,12 +15,12 @@ config.read(cfg_path)
 WIFI_SSID = config['wifi']['ssid']
 WIFI_PASSWORD = config['wifi']['password'] 
 JSON_MAP_URL = config['misc']['json_map_url'] 
-CHUNK_SIZE=config['misc']['chunk_size']
+CHUNK_SIZE=config.getint('misc', 'chunk_size')
 SD_MOUNT = config['misc']['sd_mount'] 
 IMAGES_DIR = os.path.join(SD_MOUNT, config['misc']['images_dir'])
-PERIOD_IN_MINUTES = config['time']['period_in_minutes']
-HOUR_LOWER_BOUND=config['time']['hour_lower_bound']
-HOUR_UPPER_BOUND=config['time']['hour_upper_bound']
+PERIOD_IN_MINUTES = config.getint('time', 'period_in_minutes')
+HOUR_LOWER_BOUND=config.getint('time', 'hour_lower_bound')
+HOUR_UPPER_BOUND=config.getint('time', 'hour_upper_bound')
 TIMEZONE=config['time']['tz']
 LED_BUTTONS = [inky_frame.button_a, inky_frame.button_b, inky_frame.button_c, inky_frame.button_d, inky_frame.button_e]
 LED_BUSY = inky_frame.led_busy 
@@ -50,7 +53,7 @@ def wifi_connect(disconnect):
     
 def hardware_init():
     # Limit scope of imports for memory health
-    from machine import SPI, Pin, RTC
+    from machine import SPI, Pin
     import sdcard
     # from picographics import DISPLAY_INKY_FRAME_4 as DISPLAY  # 4.0"
     # from picographics import DISPLAY_INKY_FRAME as DISPLAY    # 5.7"
@@ -146,6 +149,8 @@ def _display_jpeg(filename):
         # Used in the xkcd example, not sure if it is necessary
         #g_graphics.set_pen(inky_frame.WHITE)
         #g_graphics.clear()
+        # TODO in the example this was a singleton, but that seems unncessary
+        j = jpegdec.JPEG(g_graphics)
         j.open_file(path)
         j.decode(0, 0, jpegdec.JPEG_SCALE_FULL)
         g_graphics.update()
@@ -203,12 +208,12 @@ def download_image(filename, url):
                     if chunk:  # Filter out keep-alive new chunks
                         file.write(chunk)
                         
-        log_error(f"Image successfully downloaded and saved to: {save_path}")
+        log_warning(f"Image successfully downloaded and saved to: {path}")
         return True 
     except requests.exceptions.RequestException as e:
-        log_error(f"An error occurred during download: {e}")
         #Attempt to cleanup incase of mid download problems, not 100% robust, but should be pretty stable
         delete_image(filename)
+        log_error(f"An error occurred during download: {e}")
         return False
 
 ############
@@ -226,11 +231,6 @@ def load_json_body(url):
         with requests.get(url, allow_redirects=True, stream=False, timeout=10) as response:
             # Raise an exception for HTTP errors (404, 500, etc.)
             response.raise_for_status()
-            ## Verify that the downloaded file is actually application/json 
-            content_type = response.headers.get('Content-Type', '')
-            if 'json' not in content_type:
-                msg = "Unexpected Content-Type when loading map json, expected application/json, got: " + content_type
-                raise Exception(msg)
             payload = response.json()
             # TODO consider validating payload
             return payload
@@ -247,7 +247,7 @@ def process_json_body(json_body):
 
    active_name_set = {item['name'] for item in json_body if 'name' in item}
    # Step 1: Delete files on SD card not listed in the map
-   delete_sd_files_with_filter(active_names)
+   delete_sd_files_with_filter(active_name_set)
 
    for img_entry in json_body:
        name = img_entry['name']
@@ -330,3 +330,7 @@ def main_loop():
 
 if __name__ == "__main__":
     main_loop()
+    # To Test API calls issolated from hardware, comment out the call to main_loop, and uncomment the code below
+    # You must also uncomment inky_stubs at top of this file
+    #json_body = load_json_body(JSON_MAP_URL)
+    #process_json_body(json_body)
