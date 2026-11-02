@@ -1,5 +1,7 @@
+#Ignore virtual environemnt, potential secrets leak by checking in config, and local sd directory for mock testing
 myenv
 config.ini
+sd/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
