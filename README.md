@@ -23,7 +23,7 @@
 1. Button 1 - Advances to the next picture
 1. Button 2 - Advances to a random picture
 1. Button 3 - Currently unused 
-1. Button 4 - Currently unused 
+1. Button 4 - Drop the wifi connection and attempt to reconnect. *Experimental*
 1. Button 5 - Rests the system, deleting all local images and attempts to redownload them
 
 
