@@ -1,6 +1,3 @@
-# Uncomment the next line to test on PC without access to the Inky modules
-#import inky_stubs
-
 import configparser, gc, json, os, random, requests, time
 import inky_frame
 import jpegdec
@@ -329,8 +326,5 @@ def main_loop():
 
 
 if __name__ == "__main__":
+    """ See testbench.py for manual testing off the device. """
     main_loop()
-    # To Test API calls issolated from hardware, comment out the call to main_loop, and uncomment the code below
-    # You must also uncomment inky_stubs at top of this file
-    #json_body = load_json_body(JSON_MAP_URL)
-    #process_json_body(json_body)
