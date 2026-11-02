@@ -16,11 +16,7 @@ class MockButton:
 
 class MockInkyFrame:
     def __init__(self):
-        self.WIDTH  = 800
-        self.HEIGHT = 480
-        self.WHITE  = 1
-        self.RED    = 4 
-        self.YELLOW = 5
+        pass
 
     def display(self):
         print("[Mock Inky] Display refreshed!")
