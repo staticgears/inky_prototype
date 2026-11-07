@@ -4,7 +4,7 @@
 // Step 3: Configure these 4 ids in this script
 // Step 4: Ensure that JsonMap and outgoingFolder are set to public for anyone with the URL
 // Step 5: Share the incomingFolder with people who you want to allow to uplaod files
-// Step 6: Enable Advanced Drive Service if using scaling - Left menu, Services -> Drive Api -> Add
+// Step 6: Enable Drive Service v3 - Left menu, Services -> Drive Api -> Add
 
 const jsonMapId = "TODO";
 const incomingFolderId = "TODO";
@@ -48,14 +48,19 @@ function process_file(file) {
     const mimeType = file.getMimeType();
     const url = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
     if (is_heif(name, mimeType) || is_png(name, mimeType)) {
-      handle_conversion(name, url);
+      let newFile = handle_conversion(name, url);
       file.setTrashed(true);
+      // Update file incase an error occurs during scaling, the unscalled image will endup in the error folder
+      // Note: that in some cases the original will be lost due to differences
+      //       between files that started as JPEGs and those that dwent through the conversion flow.
+      file = newFile;
     } else if(is_jpeg(name, mimeType)) {
       file.setName(normalise_filename(file.getName()));
       file.moveTo(outgoingFolder);
     } else {
       throw new Error("Unsupported file type name: \'%s\' mime-type:'%s\'", name, mimeType);
-    }    
+    }
+    compressAndOverwriteJpegFile(file.getId());
   } catch (error) {
     console.error(Utilities.formatString("Error in process_file:: id:%s Error: %s. Stack trace: %s", fileId, error.message, error.stack));
     file.moveTo(errorFolder);
@@ -77,7 +82,7 @@ function is_heif(name, mimeType) {
 
 function handle_conversion(name, url) {
   const blob = UrlFetchApp.fetch(url, { headers: { authorization: "Bearer " + ScriptApp.getOAuthToken() } }).getBlob().getAs("image/jpeg");
-  outgoingFolder.createFile(blob.setName(normalise_filename(name)));
+  return outgoingFolder.createFile(blob.setName(normalise_filename(name)));
 }
 
 function getFilesInFolder(folderId) {
@@ -126,4 +131,66 @@ function normalise_filename(input) {
     .replace(whitespace, '');
   newName = newName  + ".jpg"
   return newName
+}
+
+/**
+ * Takes a JPEG file on Google Drive, downscales its dimensions, forces a lower quality
+ * compression profile via Drive's thumbnail renderer, and overwrites the original.
+ *
+ * IMPORTANT :: Make sure the Advanced Drive Service is turned on
+ * 1. On the left pane of your Apps Script editor, click the + next to Services.
+ * 2. Find and select Drive API V3.
+ * 3. Click Add.
+ *
+ * Note: To my knowledge a Spectra 7.3 has dimensions 800x480
+ *
+ * @param {string} originalFileId - The original JPEG file's id on Google Drive.
+ * @param {number} maxPixelDimension - The maximum allowable width or height (e.g., 800).
+ */
+function compressAndOverwriteJpegFile(originalFileId, maxPixelDimension = 800) {
+  // 1. Check dimensions
+  let refetchedFile = Drive.Files.get(originalFileId, {
+    fields: 'imageMediaMetadata, thumbnailLink'
+  });
+  let metadata = refetchedFile.getImageMediaMetadata();
+  const origWidth = parseInt(metadata.width);
+  const origHeight = parseInt(metadata.height);
+
+  // 2. Calculate the target downscaled dimensions preserving aspect ratio
+  let targetWidth = origWidth;
+
+  if (origWidth > maxPixelDimension || origHeight > maxPixelDimension) {
+    if (origWidth > origHeight) {
+      targetWidth = maxPixelDimension;
+    } else {
+      targetWidth = Math.round((origWidth * maxPixelDimension) / origHeight);
+    }
+  } else {
+    // If the image is already visually smaller, use its current width to trigger quality reduction anyway
+    targetWidth = origWidth;
+  }
+
+  // 3. Retrieve Google Drive's native thumbnail generation link for this file
+  const baseThumbnailUrl = refetchedFile.thumbnailLink;
+  if (!baseThumbnailUrl) {
+    throw new Error("Could not retrieve the thumbnail link. Ensure the file is a valid image.");
+  }
+
+  // 4. Manipulate the URL parameter to specify our exact target width (=sXXXX)
+  // Google Drive automatically scales the height proportionately and applies a high-compression pass.
+  const optimizedImageUrl = baseThumbnailUrl.replace(/=s\d+/, `=s${targetWidth}`);
+
+  // 5. Fetch the heavily compressed, downscaled image blob using authentication
+  const options = {
+    headers: {
+      Authorization: "Bearer " + ScriptApp.getOAuthToken()
+    },
+    muteHttpExceptions: true
+  };
+
+  const response = UrlFetchApp.fetch(optimizedImageUrl, options);
+  const compressedBlob = response.getBlob();
+
+  // 6. Overwrite the original file binary data with our optimized blob
+  Drive.Files.update({}, originalFileId, compressedBlob);
 }
