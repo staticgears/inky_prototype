@@ -1,6 +1,8 @@
 import datetime, sys
 from types import ModuleType
 
+g_inky_stubs = True
+
 # 1. Define fake modules
 class MockButton:
     def __init__(self):

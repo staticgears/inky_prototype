@@ -1,7 +1,12 @@
-import configparser, gc, json, os, random, requests, time
+import configparser, gc, json, os, random, time
 import inky_frame
 import jpegdec
 from machine import RTC
+
+if 'g_inky_stubs' not in globals():
+    from urllib import request as urequest
+else:
+    from urllib import urequest
 
 def mount_sd():
     # Limit scope of imports for memory health
@@ -187,36 +192,114 @@ def display_image_by_time():
     idx = (monthly_hour_epoc + g_idx_offset) % len(available_images)
     filename = sorted_paths[idx]
     _display_jpeg(filename)
-    
+
+def _download_urequest(url, path, max_redirects=5):
+    """
+        Complex overloading because this supports two usecases in order to reuse the 30X handling code
+        @returns (body, status)
+          - status -> a boolean success vs failure
+          if path = None then body will contkain the response body ie the content
+          if path is not None then body = "" aka empty string
+          Note if status == False then body always = ""
+    """
+
+    redirect_count = 0
+    current_url = url
+    response = None
+    while redirect_count <= max_redirects:
+        # MicroPython's urlopen doesn't accept 'timeout' in old versions,
+        # but modern urequest handles basic GET via string url.
+        # Note: urequest uses HTTP/1.0, so 'stream=True' is implied via raw reading.
+        try:
+            response = urequest.urlopen(current_url)
+        except Exception as e:
+            log_error(f"Connection failed: {e}")
+            return ("", False)
+
+        # Extract status code. MicroPython objects vary; check for status or code attribute
+        status_code = getattr(response, "status", getattr(response, "code", 200))
+        # MicroPython doesn't have response.raise_for_status() natively
+        if 400 <= status_code < 600:
+            log_error(f"HTTP ErrorL {status_code} while attempting google drive download.")
+            return ("", False)
+
+        # Handle 30X Redirects manually
+        if 300 <= status_code < 400:
+            # Look for the 'Location' header to find the redirect target
+            # MicroPython headers are usually case-sensitive inside a dictionary or list
+            headers = response.headers
+            location = None
+
+            if hasattr(headers, "get"):
+                location = headers.get("Location") or headers.get("location")
+            else:
+                # Fallback if headers is a raw string/list list structure
+                for header in headers:
+                    if header.lower().startswith("location:"):
+                        location = header.split(":", 1)[1].strip()
+                        break
+
+            if not location:
+                log_error(f"Redirect status {status_code} received but no Location header found.")
+                return ("", False)
+
+            # Close current response before opening a new connection to save RAM
+            response.close()
+            
+            # Handle relative redirect URLs
+            if location.startswith("/"):
+                # Simple base URL reconstruction
+                protocol, _, rest = current_url.split("/", 2)
+                domain = rest.split("/", 1)[0]
+                current_url = f"{protocol}//{domain}{location}"
+            else:
+                current_url = location
+
+            redirect_count += 1
+            continue  # Loop back to request the new URL
+        else:
+            # If it's not a 30x redirect, break out of the loop
+            break
+    else:
+        log_error("Too many redirects while attempting google drive download")
+        return ("", False)
+
+    body = None
+    try:
+        if path:
+            # MicroPython urlopen returns an object that acts as a stream
+            # or has a .raw socket stream interface
+            stream = getattr(response, "raw", response)
+            # We are streaming to a file
+            body = ""
+            with open(path, 'wb') as file:
+                while True:
+                    chunk = stream.read(CHUNK_SIZE)
+                    if not chunk: # End of stream
+                        break
+                    file.write(chunk)
+
+                    # Proactively call garbage collection during heavy I/O
+                    gc.collect()
+            stream.close()
+        else:
+            # We are reading contents directly into a variable
+            body = response.read().decode("utf-8")
+            gc.collect()
+    finally:
+        response.close()
+
+    return (body, body is not None)
+
 def download_image(filename, url):
     path = _get_image_path(filename)
     if os.path.exists(path):
-       return
-    try:
-        # allow_redirects=True is the default behavior, but explicitly stated here.
-        # stream=True processes the download in chunks to avoid overloading memory.
-        with requests.get(url, allow_redirects=True, stream=True, timeout=10) as response:
-            # Raise an exception for HTTP errors (404, 500, etc.)
-            response.raise_for_status()
-            
-            ## Verify that the downloaded file is actually an image
-            #content_type = response.headers.get('Content-Type', '')
-            #if 'image' not in content_type:
-            #   log_error(f"Warning: URL did not resolve to an image. Content-Type: {content_type}")
-
-            # Write the file chunk by chunk, we have the potential for a corrupt file here
-            with open(path, 'wb') as file:
-                for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
-                    if chunk:  # Filter out keep-alive new chunks
-                        file.write(chunk)
-                        
-        log_warning(f"Image successfully downloaded and saved to: {path}")
-        return True 
-    except requests.exceptions.RequestException as e:
-        #Attempt to cleanup incase of mid download problems, not 100% robust, but should be pretty stable
-        delete_image(filename)
-        log_error(f"An error occurred during download: {e}")
-        return False
+       return False
+    (_, result) = _download_urequest(url, path)
+    if not result:
+      #Attempt to cleanup incase of mid download problems, not 100% robust, but should be pretty stable
+      delete_image(filename)
+    return result
 
 ############
 # JSON Map #  
@@ -225,19 +308,14 @@ def load_json_body(url):
     """
        Load a json file that indicates which images need to be deleted / downloaded
        Format is a json list with this structure, all fields are required.
-       name - STRING sutable to be a filename, all LOWERCASE, with one anly one file extension, probably always .jpg
        url  - STRING public url to download the file, following redirects will be required
        [ { "name": "beach_2025.jpg" , "url": "https://drive.google.com/uc?export=view&id={file_id}" ] 
     """
-    try:
-        with requests.get(url, allow_redirects=True, stream=False, timeout=10) as response:
-            # Raise an exception for HTTP errors (404, 500, etc.)
-            response.raise_for_status()
-            payload = response.json()
-            # TODO consider validating payload
-            return payload
-    except requests.exceptions.RequestException as e:
-        log_error(f"CRITICAL ::i An error occurred during loading of json map: {e}")
+    (payload, result) = _download_urequest(url, None)
+    if payload and result:
+        return json.loads(payload)
+    else:
+        return None
 
 def process_json_body(json_body):
    """ 
@@ -246,6 +324,9 @@ def process_json_body(json_body):
        2. Skip files that already exist in the IMAGES_DIR location
        3. Download new files and save them to the IMAGES_DIR location
    """
+
+   if not json_body:
+       return
 
    active_name_set = {item['name'] for item in json_body if 'name' in item}
    # Step 1: Delete files on SD card not listed in the map
@@ -259,11 +340,7 @@ def process_json_body(json_body):
            continue
 
        # Step 3: Download new files
-       try:
-            download_image(name, img_entry['url'])
-       except requests.exceptions.RequestException as e:
-            log_error(f"CRITICAL ::i An error occurred during loading of json map: {e}")
-       
+       download_image(name, img_entry['url'])
 
 ################
 # LED controls #
@@ -319,7 +396,10 @@ def main_loop():
 
         # Step 1: Cleanup old images and add new ones
         json_body = load_json_body(JSON_MAP_URL)
-        process_json_body(json_body)
+        if json_body:
+            process_json_body(json_body)
+        else:
+            log_warning("Unable to downlaod new pictures due to failure of load_json_body")
 
         # Step 2: Select which image to display
         display_image_by_time()
