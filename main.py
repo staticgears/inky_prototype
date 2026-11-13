@@ -1,4 +1,4 @@
-import configparser, gc, json, os, random, time
+import gc, json, os, random, time
 import inky_frame
 import jpegdec
 from machine import RTC
@@ -17,6 +17,27 @@ def mount_sd():
         sd_spi = SPI(0, sck=Pin(18, Pin.OUT), mosi=Pin(19, Pin.OUT), miso=Pin(16, Pin.OUT))
         sd = sdcard.SDCard(sd_spi, Pin(22))
         os.mount(sd, "/" + SD_MOUNT)
+################
+# Config Prser #
+################
+def parse_config(filepath: str) -> dict[str, str]:
+    """Reads a 'variable=value' text file and returns a dictionary."""
+    config = {}
+
+    with open(filepath, "r", encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+
+            # Skip empty lines and comment lines starting with '#'
+            if not line or line.startswith("#"):
+                continue
+
+            # Split only on the first '=' in case the value contains '='
+            if "=" in line:
+                key, value = line.split("=", 1)
+                config[key.strip()] = value.strip()
+
+    return config
     
 #############
 # Constants #
@@ -24,17 +45,16 @@ def mount_sd():
 SD_MOUNT = 'sd' 
 mount_sd()
 cfg_path =  os.path.join(SD_MOUNT, 'config.ini')
-config = configparser.ConfigParser()
-config.read(cfg_path)
-WIFI_SSID = config['wifi']['ssid']
-WIFI_PASSWORD = config['wifi']['password'] 
-JSON_MAP_URL = config['misc']['json_map_url'] 
-CHUNK_SIZE=config.getint('misc', 'chunk_size')
-IMAGES_DIR = os.path.join(SD_MOUNT, config['misc']['images_dir'])
-PERIOD_IN_MINUTES = config.getint('time', 'period_in_minutes')
-HOUR_LOWER_BOUND=config.getint('time', 'hour_lower_bound')
-HOUR_UPPER_BOUND=config.getint('time', 'hour_upper_bound')
-TIMEZONE=config['time']['tz']
+config = parse_config(cfg_path)
+WIFI_SSID = config['wifi_ssid']
+WIFI_PASSWORD = config['wifi_password'] 
+JSON_MAP_URL = config['json_map_url'] 
+CHUNK_SIZE=int(config['chunk_size'])
+IMAGES_DIR = os.path.join(SD_MOUNT, config['images_dir'])
+PERIOD_IN_MINUTES = int(config['time_period_in_minutes'])
+HOUR_LOWER_BOUND=int(config['time_hour_lower_bound'])
+HOUR_UPPER_BOUND=int(config['time_hour_upper_bound'])
+TIMEZONE=config['time_tz']
 LED_BUTTONS = [inky_frame.button_a, inky_frame.button_b, inky_frame.button_c, inky_frame.button_d, inky_frame.button_e]
 LED_BUSY = inky_frame.led_busy 
 LED_WIFI = inky_frame.led_wifi
