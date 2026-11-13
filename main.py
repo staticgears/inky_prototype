@@ -17,9 +17,10 @@ def mount_sd():
         sd_spi = SPI(0, sck=Pin(18, Pin.OUT), mosi=Pin(19, Pin.OUT), miso=Pin(16, Pin.OUT))
         sd = sdcard.SDCard(sd_spi, Pin(22))
         os.mount(sd, "/" + SD_MOUNT)
-################
-# Config Prser #
-################
+
+#################
+# Config Parser #
+#################
 def parse_config(filepath: str) -> dict[str, str]:
     """Reads a 'variable=value' text file and returns a dictionary."""
     config = {}
