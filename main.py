@@ -3,10 +3,12 @@ import inky_frame
 import jpegdec
 from machine import RTC
 
-if 'g_inky_stubs' not in globals():
-    from urllib import request as urequest
-else:
+try:
+    # MicroPython
     from urllib import urequest
+except ImportError:
+    from urllib import request as urequest
+    print("DEBUG ::::::  Running on standard Python")
 
 def mount_sd():
     # Limit scope of imports for memory health
