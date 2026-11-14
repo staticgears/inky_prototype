@@ -15,6 +15,7 @@ def mount_sd():
     from machine import SPI, Pin
     if SPI:
         import sdcard
+        Pin(17, machine.Pin.OUT).value(1)
         # set up the SD card
         sd_spi = SPI(0, sck=Pin(18, Pin.OUT), mosi=Pin(19, Pin.OUT), miso=Pin(16, Pin.OUT))
         sd = sdcard.SDCard(sd_spi, Pin(22))
