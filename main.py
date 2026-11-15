@@ -134,6 +134,7 @@ def wifi_connect(disconnect):
         print('Connection successful!')
 
 def hardware_init():
+    global g_graphics
     makedirs(IMAGES_DIR)
 
     # Limit scope of imports for memory health
