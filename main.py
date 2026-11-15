@@ -1,4 +1,4 @@
-import gc, json, os, random, time
+import gc, json, network, os, random, time
 import inky_frame
 import jpegdec
 from machine import RTC
@@ -99,7 +99,6 @@ g_graphics = None
 g_idx_offset = 0
 
 def wifi_connect(disconnect):
-    # Limit scope of imports for memory health
     import inky_helper
 
     # Connect to WiFi
@@ -110,10 +109,23 @@ def wifi_connect(disconnect):
         except ImportError:
             log_warning("Failure to disconnect from wifi")
 
-    try:
         inky_helper.network_connect(WIFI_SSID, WIFI_PASSWORD)
-    except ImportError:
-        log_error("Failure to connect to wifi")
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+
+    # Connect to your network
+    wlan.connect(WIFI_SSID, WIFI_PASSWORD)
+    connection_timeout = 10
+    while connection_timeout > 0:
+        if wlan.status() >= 3:
+            break
+        connection_timeout -= 1
+        print('Waiting for Wi-Fi connection...')
+        time.sleep(1)
+    if wlan.status() != 3:
+        raise RuntimeError('Failed to establish a network connection')
+    else:
+        print('Connection successful!')
 
 def hardware_init():
     makedirs(IMAGES_DIR)
