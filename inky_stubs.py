@@ -57,3 +57,7 @@ sys.modules["machine"] = mock_machine
 mock_jpegdec = ModuleType("jpegdec")
 mock_jpegdec.JPEG = None 
 sys.modules["jpegdec"] = mock_jpegdec
+
+mock_network = ModuleType("network")
+mock_network.WLAN = None 
+sys.modules["network"] = mock_network

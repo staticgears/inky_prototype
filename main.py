@@ -99,17 +99,21 @@ g_graphics = None
 g_idx_offset = 0
 
 def wifi_connect(disconnect):
-    import inky_helper
+    if not network.WLAN:
+        print("Skipping WIFI code on PC")
+        return
 
     # Connect to WiFi
     gc.collect()
     if disconnect:
         try:
-            inky_helper.network_disconnect()
+            wlan.disconnect()
+            time.sleep(0.5)
         except ImportError:
             log_warning("Failure to disconnect from wifi")
+        finally:
+            wlan.active(False)
 
-        inky_helper.network_connect(WIFI_SSID, WIFI_PASSWORD)
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
 
