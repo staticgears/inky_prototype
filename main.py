@@ -258,7 +258,7 @@ def display_image_by_time():
     if len(sorted_paths) == 0:
        log_warning("No images to display")
        return
-    idx = (monthly_hour_epoc + g_idx_offset) % len(available_images)
+    idx = (monthly_hour_epoc + g_idx_offset) % len(sorted_paths)
     filename = sorted_paths[idx]
     _display_jpeg(filename)
 
