@@ -217,9 +217,11 @@ def write_text(msg, error):
       
 
 def _display_jpeg(filename):
+    print("DEBUG :: _display_jpeg BEGINING")
     if not g_graphics:
         return
     path = _get_image_path(filename)
+    print("DEBUG :: _display_jpeg path = " + path)
     try:
         gc.collect()
         # Used in the xkcd example, not sure if it is necessary
@@ -231,7 +233,8 @@ def _display_jpeg(filename):
         j.decode(0, 0, jpegdec.JPEG_SCALE_FULL)
         g_graphics.update()
     except Exception as e:
-        log_error(f"CRITICAL ::i An error occurred during loading of json map: {e}")
+        log_error(f"CRITICAL ::i An error occurred displaying image: {e}")
+        print("DEBUG :: _display_jpeg ERROR {e}")
 
 def display_image_by_time():
     """
@@ -240,6 +243,7 @@ def display_image_by_time():
        In combinatio nwith an number of hours since the begining of the month, we module against hte number of aivlable images
     """
     monthly_hour_epoc = 0
+    print("DEBUG :: display_image_by_time BEGINING")
     year, _, _, days, hours, _, _, _ = RTC().datetime()
     if year < 2023:
       # Connect to network
@@ -255,11 +259,14 @@ def display_image_by_time():
     if days > 0:
        monthly_hour_epoc += (days - 1)*24
     sorted_paths = sorted(list_images())
+    print("DEBUG :: display_image_by_time step 1")
     if len(sorted_paths) == 0:
        log_warning("No images to display")
        return
     idx = (monthly_hour_epoc + g_idx_offset) % len(sorted_paths)
+    print("DEBUG :: display_image_by_time step 2 idx = " + idx)
     filename = sorted_paths[idx]
+    print("DEBUG :: display_image_by_time step 3 filename = " + filename)
     _display_jpeg(filename)
 
 def _resolve_redirect_url(base_url, location):
@@ -366,10 +373,12 @@ def download_image(filename, url):
     path = _get_image_path(filename)
     if file_exists(path):
        return False
+    print("DEBUG :: download_image attempting to download " + url)
     (_, result) = _download_urequest(url, path)
     if not result:
       #Attempt to cleanup incase of mid download problems, not 100% robust, but should be pretty stable
       delete_image(filename)
+    print("DEBUG :: Success")
     return result
 
 ############
