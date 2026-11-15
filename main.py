@@ -10,6 +10,9 @@ except ImportError:
     from urllib import request as urequest
     print("DEBUG ::::::  Running on standard Python")
 
+#######################
+# File System Helpers #
+#######################
 def mount_sd():
     # Limit scope of imports for memory health
     from machine import SPI, Pin
@@ -20,6 +23,30 @@ def mount_sd():
         sd_spi = SPI(0, sck=Pin(18, Pin.OUT), mosi=Pin(19, Pin.OUT), miso=Pin(16, Pin.OUT))
         sd = sdcard.SDCard(sd_spi, Pin(22))
         os.mount(sd, "/" + SD_MOUNT)
+
+def file_exists(path):
+    try:
+        os.stat(path)
+        return True
+    except OSError:
+        return False
+
+def path_join(p1, p2):
+    return p1 + "/" + p2
+
+def makedirs(path):
+    parts = path.split("/")
+    current = ""
+    for part in parts:
+        if not part:
+            continue
+        current = current + "/" + part if path.startswith("/") else (current + "/" + part if current else part)
+        try:
+            os.mkdir(current)
+        except OSError as e:
+            # 17 is EEXIST (directory already exists)
+            if e.args[0] != 17:
+                raise
 
 #################
 # Config Parser #
@@ -48,13 +75,13 @@ def parse_config(filepath: str) -> dict[str, str]:
 #############
 SD_MOUNT = 'sd' 
 mount_sd()
-cfg_path =  os.path.join(SD_MOUNT, 'config.ini')
+cfg_path =  path_join(SD_MOUNT, 'config.ini')
 config = parse_config(cfg_path)
 WIFI_SSID = config['wifi_ssid']
 WIFI_PASSWORD = config['wifi_password'] 
 JSON_MAP_URL = config['json_map_url'] 
 CHUNK_SIZE=int(config['chunk_size'])
-IMAGES_DIR = os.path.join(SD_MOUNT, config['images_dir'])
+IMAGES_DIR = path_join(SD_MOUNT, config['images_dir'])
 PERIOD_IN_MINUTES = int(config['time_period_in_minutes'])
 HOUR_LOWER_BOUND=int(config['time_hour_lower_bound'])
 HOUR_UPPER_BOUND=int(config['time_hour_upper_bound'])
@@ -89,7 +116,7 @@ def wifi_connect(disconnect):
         log_error("Failure to connect to wifi")
 
 def hardware_init():
-    os.makedirs(IMAGES_DIR, exist_ok=True)
+    makedirs(IMAGES_DIR)
 
     # Limit scope of imports for memory health
     # from picographics import DISPLAY_INKY_FRAME_4 as DISPLAY  # 4.0"
@@ -134,11 +161,11 @@ def log_error(msg):
 # File / Network Operations #
 #############################
 def _get_image_path(filename):
-    return os.path.join(IMAGES_DIR, filename)
+    return path_join(IMAGES_DIR, filename)
 
 def check_existence_of_image(filename):
     path = _get_image_path(filename)
-    return os.path.exists(path)
+    return file_exists(path)
     
 def list_images():
     return os.listdir(IMAGES_DIR)
@@ -147,14 +174,14 @@ def delete_image(filename):
     #TODO does deleting a displayed image require special handling, for now I'm assuming not
     try:
         path = _get_image_path(filename)
-        if os.path.exists(path):
+        if file_exists(path):
             os.remove(path)
     except Exception as e:
         log_error(f"Failed to delete {file_path}. Reason: {e}")
 
 def delete_sd_files_with_filter(names_filter_set):
     """ Delete all files in the IMAGES_DIR, except those found in the names_filter_set """
-    if not os.path.exists(IMAGES_DIR):
+    if not file_exists(IMAGES_DIR):
         return
     for filename in list_images():
         if filename not in names_filter_set:
@@ -317,7 +344,7 @@ def _download_urequest(url, path, max_redirects=5):
 
 def download_image(filename, url):
     path = _get_image_path(filename)
-    if os.path.exists(path):
+    if file_exists(path):
        return False
     (_, result) = _download_urequest(url, path)
     if not result:
