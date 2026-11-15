@@ -317,6 +317,7 @@ def _download_urequest(url, path, max_redirects=5):
                     return ("", False)
 
                 current_url = _resolve_redirect_url(current_url, location)
+                print("DEBUG ::: " + current_url)
                 redirects += 1
                 continue # Loop back to request the new URL
 
@@ -347,7 +348,7 @@ def _download_urequest(url, path, max_redirects=5):
                 return ("", True)
 
         except Exception as e:
-            log_error(f"Downlaod from Google Drive failed: {e}")
+            log_error(f"Download from Google Drive failed: {e}")
             return ("", False)
         finally:
             if response is not None:
@@ -469,7 +470,7 @@ def main_loop():
         if json_body:
             process_json_body(json_body)
         else:
-            log_warning("Unable to downlaod new pictures due to failure of load_json_body")
+            log_warning("Unable to download new pictures due to failure of load_json_body")
 
         # Step 2: Select which image to display
         display_image_by_time()
