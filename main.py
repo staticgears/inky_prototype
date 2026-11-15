@@ -264,7 +264,7 @@ def display_image_by_time():
        log_warning("No images to display")
        return
     idx = (monthly_hour_epoc + g_idx_offset) % len(sorted_paths)
-    print("DEBUG :: display_image_by_time step 2 idx = " + idx)
+    print("DEBUG :: display_image_by_time step 2 idx = " + str(idx))
     filename = sorted_paths[idx]
     print("DEBUG :: display_image_by_time step 3 filename = " + filename)
     _display_jpeg(filename)
@@ -335,7 +335,7 @@ def _download_urequest(url, path, max_redirects=5):
 
             # Usecase 1: Return response content in memory
             if path is None:
-                body = response.content.decode("utf-8")
+                body = response.content.decode("utf-8-sig")
                 response.close()
                 gc.collect()
                 return (body, True)
