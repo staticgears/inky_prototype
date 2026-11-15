@@ -222,7 +222,7 @@ def display_image_by_time():
        In combinatio nwith an number of hours since the begining of the month, we module against hte number of aivlable images
     """
     monthly_hour_epoc = 0
-    year, _, _, days, hours, _, _, _ = RTC().datetime().astimezone(ZoneInfo(TIMEZONE))
+    year, _, _, days, hours, _, _, _ = RTC().datetime()
     if year < 2023:
       # Connect to network
        inky_frame.set_time()  # Sets both the Inky and Pico RTC
