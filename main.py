@@ -5,9 +5,9 @@ from machine import RTC
 
 try:
     # MicroPython
-    from urllib import urequest
+    import urequests
 except ImportError:
-    from urllib import request as urequest
+    import requests as urequests
     print("DEBUG ::::::  Running on standard Python")
 
 #######################
@@ -244,6 +244,25 @@ def display_image_by_time():
     filename = sorted_paths[idx]
     _display_jpeg(filename)
 
+def _resolve_redirect_url(base_url, location):
+    """Resolves relative redirect Location headers against the current URL."""
+    if location.startswith("http://") or location.startswith("https://"):
+        return location
+
+    # Extract scheme and host (e.g., "https://example.com")
+    scheme_end = base_url.find("://") + 3
+    path_start = base_url.find("/", scheme_end)
+    origin = base_url if path_start == -1 else base_url[:path_start]
+
+    if location.startswith("/"):
+        return origin + location
+
+    # Handle relative path without leading slash
+    last_slash = base_url.rfind("/")
+    if last_slash >= scheme_end:
+        return base_url[: last_slash + 1] + location
+    return origin + "/" + location
+
 def _download_urequest(url, path, max_redirects=5):
     """
         Complex overloading because this supports two usecases in order to reuse the 30X handling code
@@ -253,94 +272,76 @@ def _download_urequest(url, path, max_redirects=5):
           if path is not None then body = "" aka empty string
           Note if status == False then body always = ""
     """
-
-    redirect_count = 0
     current_url = url
-    response = None
-    while redirect_count <= max_redirects:
-        # MicroPython's urlopen doesn't accept 'timeout' in old versions,
-        # but modern urequest handles basic GET via string url.
-        # Note: urequest uses HTTP/1.0, so 'stream=True' is implied via raw reading.
+    redirects = 0
+
+    while redirects <= max_redirects:
+        response = None
         try:
-            response = urequest.urlopen(current_url)
-        except Exception as e:
-            log_error(f"Connection failed: {e}")
-            return ("", False)
+            gc.collect()
+            response = urequests.get(current_url)
+            status_code = response.status_code
 
-        # Extract status code. MicroPython objects vary; check for status or code attribute
-        status_code = getattr(response, "status", getattr(response, "code", 200))
-        # MicroPython doesn't have response.raise_for_status() natively
-        if 400 <= status_code < 600:
-            log_error(f"HTTP ErrorL {status_code} while attempting google drive download.")
-            return ("", False)
+            # Handle 30X redirects
+            if status_code in (301, 302, 303, 307, 308):
+                location = None
+                if hasattr(response, "headers") and response.headers:
+                    for k, v in response.headers.items():
+                        if k.lower() == "location":
+                            location = v
+                            break
 
-        # Handle 30X Redirects manually
-        if 300 <= status_code < 400:
-            # Look for the 'Location' header to find the redirect target
-            # MicroPython headers are usually case-sensitive inside a dictionary or list
-            headers = response.headers
-            location = None
+                response.close()
+                response = None
 
-            if hasattr(headers, "get"):
-                location = headers.get("Location") or headers.get("location")
-            else:
-                # Fallback if headers is a raw string/list list structure
-                for header in headers:
-                    if header.lower().startswith("location:"):
-                        location = header.split(":", 1)[1].strip()
-                        break
+                if not location:
+                    log_error(f"Redirect status {status_code} received but no Location header found.")
+                    return ("", False)
 
-            if not location:
-                log_error(f"Redirect status {status_code} received but no Location header found.")
+                current_url = _resolve_redirect_url(current_url, location)
+                redirects += 1
+                continue # Loop back to request the new URL
+
+            if status_code != 200:
+                log_error(f"HTTP ErrorL {status_code} while attempting google drive download.")
+                response.close()
                 return ("", False)
 
-            # Close current response before opening a new connection to save RAM
-            response.close()
-            
-            # Handle relative redirect URLs
-            if location.startswith("/"):
-                # Simple base URL reconstruction
-                protocol, _, rest = current_url.split("/", 2)
-                domain = rest.split("/", 1)[0]
-                current_url = f"{protocol}//{domain}{location}"
+            # Usecase 1: Return response content in memory
+            if path is None:
+                body = response.content.decode("utf-8")
+                response.close()
+                gc.collect()
+                return (body, True)
             else:
-                current_url = location
+                # Usecase 2: Stream response directly to file in chunks to save RAM
+                with open(path, "wb") as f:
+                    while True:
+                        chunk = response.raw.read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        # Proactively call garbage collection during heavy I/O
+                        gc.collect()
 
-            redirect_count += 1
-            continue  # Loop back to request the new URL
-        else:
-            # If it's not a 30x redirect, break out of the loop
-            break
-    else:
-        log_error("Too many redirects while attempting google drive download")
-        return ("", False)
+                response.close()
+                gc.collect()
+                return ("", True)
 
-    body = None
-    try:
-        if path:
-            # MicroPython urlopen returns an object that acts as a stream
-            # or has a .raw socket stream interface
-            stream = getattr(response, "raw", response)
-            # We are streaming to a file
-            body = ""
-            with open(path, 'wb') as file:
-                while True:
-                    chunk = stream.read(CHUNK_SIZE)
-                    if not chunk: # End of stream
-                        break
-                    file.write(chunk)
-
-                    # Proactively call garbage collection during heavy I/O
-                    gc.collect()
-            stream.close()
-        else:
-            # We are reading contents directly into a variable
-            body = response.read().decode("utf-8")
+        except Exception as e:
+            log_error(f"Downlaod from Google Drive failed: {e}")
+            return ("", False)
+        finally:
+            if response is not None:
+                try:
+                    response.close()
+                except Exception as e:
+                    pass
             gc.collect()
-    finally:
-        response.close()
-
-    return (body, body is not None)
+    # Exceeded max_redirects
+    log_error("Too many redirects while attempting google drive download")
+    gc.collect()
+    return ("", False)
 
 def download_image(filename, url):
     path = _get_image_path(filename)
