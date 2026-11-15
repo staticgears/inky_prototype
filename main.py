@@ -206,6 +206,7 @@ def delete_sd_files_with_filter(names_filter_set):
             delete_image(filename) 
 
 def write_text(msg, error):
+    global g_graphics
     if g_graphics:
       WIDTH, HEIGHT = g_graphics.get_bounds()
       g_graphics.set_font("bitmap8")
@@ -217,6 +218,7 @@ def write_text(msg, error):
       
 
 def _display_jpeg(filename):
+    global g_graphics
     print("DEBUG :: _display_jpeg BEGINING")
     if not g_graphics:
         return
