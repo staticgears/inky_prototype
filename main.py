@@ -110,7 +110,7 @@ def wifi_connect(disconnect):
             wlan.disconnect()
             time.sleep(0.5)
         except Exception as e:
-            log_warning("Failure to disconnect from wifi, Reason: {e}")
+            log_warning(f"Failure to disconnect from wifi, Reason: {e}")
         finally:
             wlan.active(False)
 
@@ -236,8 +236,8 @@ def _display_jpeg(filename):
         j.decode(0, 0, jpegdec.JPEG_SCALE_FULL)
         g_graphics.update()
     except Exception as e:
-        log_error(f"CRITICAL ::i An error occurred displaying image: {e}")
-        print("DEBUG :: _display_jpeg ERROR {e}")
+        log_error(f"CRITICAL :: An error occurred displaying image: {e}")
+        raise e
 
 def display_image_by_time():
     """
