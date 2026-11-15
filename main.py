@@ -215,7 +215,7 @@ def write_text(msg, error):
       g_graphics.clear()
       g_graphics.set_pen(inky_frame.RED if error else inky_frame.YELLOW)
       # g_graphics.measure_text(text, scale, spacing, fixed_width)
-      g_graphics.text(mag, 10, 10, WIDTH-30, scale=3)
+      g_graphics.text(msg, 10, 10, WIDTH-30, scale=3)
       
 
 def _display_jpeg(filename):
