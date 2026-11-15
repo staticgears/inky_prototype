@@ -109,8 +109,8 @@ def wifi_connect(disconnect):
         try:
             wlan.disconnect()
             time.sleep(0.5)
-        except ImportError:
-            log_warning("Failure to disconnect from wifi")
+        except Exception as e:
+            log_warning("Failure to disconnect from wifi, Reason: {e}")
         finally:
             wlan.active(False)
 
@@ -118,6 +118,7 @@ def wifi_connect(disconnect):
     wlan.active(True)
 
     # Connect to your network
+    #print("DEBUG ::: '" + WIFI_SSID + "' -> '" + WIFI_PASSWORD + "'")
     wlan.connect(WIFI_SSID, WIFI_PASSWORD)
     connection_timeout = 10
     while connection_timeout > 0:
@@ -127,6 +128,7 @@ def wifi_connect(disconnect):
         print('Waiting for Wi-Fi connection...')
         time.sleep(1)
     if wlan.status() != 3:
+        wlan.active(False)
         raise RuntimeError('Failed to establish a network connection')
     else:
         print('Connection successful!')
