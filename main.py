@@ -4,11 +4,13 @@ import jpegdec
 from machine import RTC
 
 DEBUG=0
+on_pc = False
 try:
     # MicroPython
     import urequests
 except ImportError:
     import requests as urequests
+    on_pc = True
     print("DEBUG ::::::  Running on standard Python")
 
 #######################
@@ -54,7 +56,7 @@ def _mount_sd():
         return False
 
 def mount_sd(retries=5):
-    if SPI:
+    if not on_pc:
         success = False
         for attempt in range(1, retries + 1):
             if _mount_sd():
