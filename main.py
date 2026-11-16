@@ -3,7 +3,14 @@ import inky_frame
 import jpegdec
 from machine import RTC
 
-DEBUG=0
+# Default to on just incase we haven't read the config yet
+DEBUG=1
+
+def log_debug(ctxt, msg):
+    global DEBUG
+    if DEBUG:
+        print(f"DEBUG :: {ctxt} -> {msg}")
+
 on_pc = False
 try:
     # MicroPython
@@ -207,11 +214,6 @@ def hardware_init():
 ###########
 # Logging #
 ###########
-def log_debug(ctxt, msg):
-    global DEBUG
-    if DEBUG:
-        print(f"DEBUG :: {ctxt} -> {msg}")
-
 def log_warning(msg):
     """ Abstract warning logging incase we get fancier with LED incators, email, or unified logger """
     print(msg)
