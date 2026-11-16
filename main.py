@@ -15,6 +15,9 @@ except ImportError:
 # File System Helpers #
 #######################
 def _mount_sd():
+    # Limit scope of imports for memory health
+    import sdcard
+    from machine import SPI, Pin
     mount_point = "/" + SD_MOUNT
     # Clean up any existing mount point from a previous soft-reset
     try:
@@ -51,11 +54,8 @@ def _mount_sd():
         return False
 
 def mount_sd(retries=5):
-    # Limit scope of imports for memory health
-    from machine import SPI, Pin
     if SPI:
         success = False
-        import sdcard
         for attempt in range(1, retries + 1):
             if _mount_sd():
                 success = True
