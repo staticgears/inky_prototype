@@ -3,6 +3,7 @@ import inky_frame
 import jpegdec
 from machine import RTC
 
+DEBUG=0
 try:
     # MicroPython
     import urequests
@@ -13,16 +14,53 @@ except ImportError:
 #######################
 # File System Helpers #
 #######################
-def mount_sd():
+def _mount_sd():
+    mount_point = "/" + SD_MOUNT
+    # Clean up any existing mount point from a previous soft-reset
+    try:
+        os.umount(mount_point)
+    except OSError:
+        # Ignore error if it wasn't mounted in the first place
+        pass
+
+    Pin(17, machine.Pin.OUT, value=1)
+    cs = Pin(22, Pin.OUT, value=1)
+
+    sd_spi = None
+    try:
+        # set up the SD card
+        sd_spi = SPI(0, baudrate=100_000, sck=Pin(18, Pin.OUT), mosi=Pin(19, Pin.OUT), miso=Pin(16, Pin.OUT))
+
+
+        # Flush the card: Send 80+ clock cycles with CS HIGH
+        # This clears any hung state from an interrupted read/write
+        cs.value(1)
+        sd_spi.write(b'\xff' * 10)
+        time.sleep_ms(10)
+
+        sd = sdcard.SDCard(sd_spi, cs)
+        os.mount(sd, mount_point)
+        return True
+    except OSError as e:
+        log_debug("_mount_sd", f"Caught OSError: {e}")
+        if sd_spi:
+            sd_spi.deinit()  # Release SPI hardware before retrying
+            sd_spi = None
+            time.sleep_ms(250)
+        return False
+
+def mount_sd(retries=5):
     # Limit scope of imports for memory health
     from machine import SPI, Pin
     if SPI:
+        success = False
         import sdcard
-        Pin(17, machine.Pin.OUT).value(1)
-        # set up the SD card
-        sd_spi = SPI(0, sck=Pin(18, Pin.OUT), mosi=Pin(19, Pin.OUT), miso=Pin(16, Pin.OUT))
-        sd = sdcard.SDCard(sd_spi, Pin(22))
-        os.mount(sd, "/" + SD_MOUNT)
+        for attempt in range(1, retries + 1):
+            if _mount_sd():
+                success = True
+                break
+        if not success:
+            raise RuntimeError(f"Failed to mount SD card after {retries} attempts.")
 
 def file_exists(path):
     try:
@@ -77,6 +115,7 @@ SD_MOUNT = 'sd'
 mount_sd()
 cfg_path =  path_join(SD_MOUNT, 'config.ini')
 config = parse_config(cfg_path)
+DEBUG = int(config['debug'])
 WIFI_SSID = config['wifi_ssid']
 WIFI_PASSWORD = config['wifi_password'] 
 JSON_MAP_URL = config['json_map_url'] 
@@ -118,7 +157,6 @@ def wifi_connect(disconnect):
     wlan.active(True)
 
     # Connect to your network
-    #print("DEBUG ::: '" + WIFI_SSID + "' -> '" + WIFI_PASSWORD + "'")
     wlan.connect(WIFI_SSID, WIFI_PASSWORD)
     connection_timeout = 10
     while connection_timeout > 0:
@@ -166,6 +204,11 @@ def hardware_init():
 ###########
 # Logging #
 ###########
+def log_debug(ctxt, msg):
+    global DEBUG
+    if DEBUG:
+        print(f"DEBUG :: {ctxt} -> {msg}")
+
 def log_warning(msg):
     """ Abstract warning logging incase we get fancier with LED incators, email, or unified logger """
     print(msg)
@@ -220,11 +263,10 @@ def write_text(msg, error):
 
 def _display_jpeg(filename):
     global g_graphics
-    print("DEBUG :: _display_jpeg BEGINING")
     if not g_graphics:
         return
     path = _get_image_path(filename)
-    print("DEBUG :: _display_jpeg path = " + path)
+    log_debug("_display_jpeg", f"path = {path}")
     try:
         gc.collect()
         # Used in the xkcd example, not sure if it is necessary
@@ -246,7 +288,6 @@ def display_image_by_time():
        In combinatio nwith an number of hours since the begining of the month, we module against hte number of aivlable images
     """
     monthly_hour_epoc = 0
-    print("DEBUG :: display_image_by_time BEGINING")
     year, _, _, days, hours, _, _, _ = RTC().datetime()
     if year < 2023:
       # Connect to network
@@ -262,14 +303,12 @@ def display_image_by_time():
     if days > 0:
        monthly_hour_epoc += (days - 1)*24
     sorted_paths = sorted(list_images())
-    print("DEBUG :: display_image_by_time step 1")
     if len(sorted_paths) == 0:
        log_warning("No images to display")
        return
     idx = (monthly_hour_epoc + g_idx_offset) % len(sorted_paths)
-    print("DEBUG :: display_image_by_time step 2 idx = " + str(idx))
     filename = sorted_paths[idx]
-    print("DEBUG :: display_image_by_time step 3 filename = " + filename)
+    log_debug("display_image_by_time", f"filename = {filename}")
     _display_jpeg(filename)
 
 def _resolve_redirect_url(base_url, location):
@@ -327,7 +366,6 @@ def _download_urequest(url, path, max_redirects=5):
                     return ("", False)
 
                 current_url = _resolve_redirect_url(current_url, location)
-                print("DEBUG ::: " + current_url)
                 redirects += 1
                 continue # Loop back to request the new URL
 
@@ -338,7 +376,7 @@ def _download_urequest(url, path, max_redirects=5):
 
             # Usecase 1: Return response content in memory
             if path is None:
-                body = response.content.decode("utf-8-sig")
+                body = response.content.decode("utf-8")
                 response.close()
                 gc.collect()
                 return (body, True)
@@ -376,12 +414,12 @@ def download_image(filename, url):
     path = _get_image_path(filename)
     if file_exists(path):
        return False
-    print("DEBUG :: download_image attempting to download " + url)
+    log_debug("download_image", f"attempting to download: {url}")
     (_, result) = _download_urequest(url, path)
     if not result:
       #Attempt to cleanup incase of mid download problems, not 100% robust, but should be pretty stable
       delete_image(filename)
-    print("DEBUG :: Success")
+    log_debug("download_image", "Success")
     return result
 
 ############
@@ -423,6 +461,7 @@ def process_json_body(json_body):
            continue
 
        # Step 3: Download new files
+       log_debug("process_json_body", f"Downloading image {name} from {img_entry['url']}")
        download_image(name, img_entry['url'])
 
 ################
