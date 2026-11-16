@@ -118,12 +118,31 @@ def parse_config(filepath: str) -> dict[str, str]:
                 config[key.strip()] = value.strip()
 
     return config
-    
+
+###########################
+# Graphics initialization #
+###########################
+g_graphics = None
+def graphics_init():
+    global g_graphics
+    if not on_pc:
+        # Limit scope of imports for memory health
+        # from picographics import DISPLAY_INKY_FRAME_4 as DISPLAY  # 4.0"
+        # from picographics import DISPLAY_INKY_FRAME as DISPLAY    # 5.7"
+        # from picographics import DISPLAY_INKY_FRAME_7 as DISPLAY  # 7.3"
+        from picographics import DISPLAY_INKY_FRAME_SPECTRA_7 as DISPLAY  # 7.3" Spectra
+        from picographics import PicoGraphics
+
+        # Initialise the Display
+        g_graphics = PicoGraphics(DISPLAY)
+
 #############
 # Constants #
 #############
 SD_MOUNT = 'sd' 
+graphics_init()
 mount_sd()
+
 cfg_path =  path_join(SD_MOUNT, 'config.ini')
 config = parse_config(cfg_path)
 DEBUG = int(config['debug'])
@@ -143,7 +162,6 @@ config = None # Release memory
 ##################
 # Initialisation #
 ##################
-g_graphics = None 
 # global image index skip, for button based fast forwarding and randomization
 g_idx_offset = 0
 
@@ -182,21 +200,9 @@ def wifi_connect(disconnect):
         log_debug('wifi_connect', 'Connection successful!')
 
 def hardware_init():
-    global g_graphics
     makedirs(IMAGES_DIR)
-
-    # Limit scope of imports for memory health
-    # from picographics import DISPLAY_INKY_FRAME_4 as DISPLAY  # 4.0"
-    # from picographics import DISPLAY_INKY_FRAME as DISPLAY    # 5.7"
-    # from picographics import DISPLAY_INKY_FRAME_7 as DISPLAY  # 7.3"
-    from picographics import DISPLAY_INKY_FRAME_SPECTRA_7 as DISPLAY  # 7.3" Spectra
-    from picographics import PicoGraphics
-
     # Sync time
     inky_frame.pcf_to_pico_rtc() 
-
-    # Initialise the Display
-    g_graphics = PicoGraphics(DISPLAY)
 
     # TODO This part may not be needed, seen in https://github.com/pimoroni/inky-frame/blob/main/examples/inky_frame_news.py
     # intialise the pcf85063a real time clock chip
