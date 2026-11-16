@@ -40,6 +40,7 @@ def _mount_sd():
 
         sd = sdcard.SDCard(sd_spi, cs)
         os.mount(sd, mount_point)
+        log_debug("_mount_sd", "SD card mounted successfully.")
         return True
     except OSError as e:
         log_debug("_mount_sd", f"Caught OSError: {e}")
@@ -59,6 +60,7 @@ def mount_sd(retries=5):
             if _mount_sd():
                 success = True
                 break
+            log_debug("mount_sd", "reattempting SD card mount after failure...")
         if not success:
             raise RuntimeError(f"Failed to mount SD card after {retries} attempts.")
 
@@ -124,7 +126,6 @@ IMAGES_DIR = path_join(SD_MOUNT, config['images_dir'])
 PERIOD_IN_MINUTES = int(config['time_period_in_minutes'])
 HOUR_LOWER_BOUND=int(config['time_hour_lower_bound'])
 HOUR_UPPER_BOUND=int(config['time_hour_upper_bound'])
-TIMEZONE=config['time_tz']
 LED_BUTTONS = [inky_frame.button_a, inky_frame.button_b, inky_frame.button_c, inky_frame.button_d, inky_frame.button_e]
 LED_BUSY = inky_frame.led_busy 
 LED_WIFI = inky_frame.led_wifi
@@ -163,13 +164,13 @@ def wifi_connect(disconnect):
         if wlan.status() >= 3:
             break
         connection_timeout -= 1
-        print('Waiting for Wi-Fi connection...')
+        log_debug('wifi_connect', 'Waiting for Wi-Fi connection...')
         time.sleep(1)
     if wlan.status() != 3:
         wlan.active(False)
         raise RuntimeError('Failed to establish a network connection')
     else:
-        print('Connection successful!')
+        log_debug('wifi_connect', 'Connection successful!')
 
 def hardware_init():
     global g_graphics
@@ -266,7 +267,7 @@ def _display_jpeg(filename):
     if not g_graphics:
         return
     path = _get_image_path(filename)
-    log_debug("_display_jpeg", f"path = {path}")
+    log_debug("_display_jpeg", f"loading image at path = {path} ...")
     try:
         gc.collect()
         # Used in the xkcd example, not sure if it is necessary
@@ -280,6 +281,7 @@ def _display_jpeg(filename):
     except Exception as e:
         log_error(f"CRITICAL :: An error occurred displaying image: {e}")
         raise e
+    log_debug("_display_jpeg", "Successfully loaded image.")
 
 def display_image_by_time():
     """
@@ -366,6 +368,7 @@ def _download_urequest(url, path, max_redirects=5):
                     return ("", False)
 
                 current_url = _resolve_redirect_url(current_url, location)
+                log_debug("_download_urequest", f"Received a redirect to {current_url}")
                 redirects += 1
                 continue # Loop back to request the new URL
 
@@ -379,6 +382,7 @@ def _download_urequest(url, path, max_redirects=5):
                 body = response.content.decode("utf-8")
                 response.close()
                 gc.collect()
+                log_debug("_download_urequest", f"Success, contents read into memory:\n{body}\n--------END BODY--------")
                 return (body, True)
             else:
                 # Usecase 2: Stream response directly to file in chunks to save RAM
@@ -391,6 +395,7 @@ def _download_urequest(url, path, max_redirects=5):
                         # Proactively call garbage collection during heavy I/O
                         gc.collect()
 
+                log_debug("_download_urequest", f"Success, File written {path}")
                 response.close()
                 gc.collect()
                 return ("", True)
