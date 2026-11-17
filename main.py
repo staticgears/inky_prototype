@@ -280,13 +280,18 @@ def _display_jpeg(filename):
     log_debug("_display_jpeg", f"loading image at path = {path} ...")
     try:
         gc.collect()
-        # Used in the xkcd example, not sure if it is necessary
+        screen_w, screen_h = g_graphics.get_bounds()
+        # Choose a colour and uncomment these lines to choose a background colour
+        # Colour options: BLACK, WHITE, GREEN, BLUE, RED, YELLOW, ORANGE, TAUPE
         #g_graphics.set_pen(inky_frame.WHITE)
         #g_graphics.clear()
         # TODO in the example this was a singleton, but that seems unncessary
         j = jpegdec.JPEG(g_graphics)
         j.open_file(path)
-        j.decode(0, 0, jpegdec.JPEG_SCALE_FULL)
+        screen_w, screen_h = g_graphics.get_bounds()
+        x_offset = max(0, (screen_w - j.get_width()) // 2)
+        y_offset = max(0, (screen_h - j.get_height()) // 2)
+        j.decode(x_offset, y_offset, jpegdec.JPEG_SCALE_FULL)
         g_graphics.update()
     except Exception as e:
         log_error(f"CRITICAL :: An error occurred displaying image: {e}")
