@@ -191,6 +191,17 @@ function compressAndOverwriteJpegFile(originalFileId, maxPixelDimension = 800) {
   const response = UrlFetchApp.fetch(optimizedImageUrl, options);
   const compressedBlob = response.getBlob();
 
-  // 6. Overwrite the original file binary data with our optimized blob
-  Drive.Files.update({}, originalFileId, compressedBlob);
+  // 6. Reencode as a baseline jpeg
+  const jpegBytes = new Uint8Array(compressedBlob.getBytes());
+
+  const rawImageData = jpeg.decode(jpegBytes, { useTArray: true });
+  const baselineEncoded = jpeg.encode(rawImageData, 85);
+  const baselineBlob = Utilities.newBlob(
+    Array.from(baselineEncoded.data),
+    'image/jpeg',
+    compressedBlob.getName()
+  );
+
+  // 7. Overwrite the original file binary data with the new blob
+  Drive.Files.update({}, originalFileId, baselineBlob);
 }
