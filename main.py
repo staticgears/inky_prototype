@@ -260,7 +260,7 @@ def delete_sd_files_with_filter(names_filter_set):
         if filename not in names_filter_set:
             delete_image(filename) 
 
-def write_text(msg, error):
+def write_text(msg, error, update=True):
     global g_graphics
     if g_graphics:
       WIDTH, HEIGHT = g_graphics.get_bounds()
@@ -270,6 +270,8 @@ def write_text(msg, error):
       g_graphics.set_pen(inky_frame.RED if error else inky_frame.YELLOW)
       # g_graphics.measure_text(text, scale, spacing, fixed_width)
       g_graphics.text(msg, 10, 10, WIDTH-30, scale=3)
+      if update:
+          g_graphics.update()
       
 
 def _display_jpeg(filename):
