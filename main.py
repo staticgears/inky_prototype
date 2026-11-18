@@ -123,6 +123,7 @@ def parse_config(filepath: str) -> dict[str, str]:
 # Graphics initialization #
 ###########################
 g_graphics = None
+g_sr = None
 def graphics_init():
     global g_graphics
     if not on_pc:
@@ -200,6 +201,7 @@ def wifi_connect(disconnect):
         log_debug('wifi_connect', 'Connection successful!')
 
 def hardware_init():
+    global g_sr
     makedirs(IMAGES_DIR)
     # Sync time
     inky_frame.pcf_to_pico_rtc() 
@@ -213,6 +215,13 @@ def hardware_init():
     i2c = PimoroniI2C(I2C_SDA_PIN, I2C_SCL_PIN, 100000)
     rtc = PCF85063A(i2c)
     rtc.enable_timer_interrupt(True)
+
+    from pimoroni import ShiftRegister
+    # Inky Frame uses a shift register to read the buttons
+    SR_CLOCK = 8
+    SR_LATCH = 9
+    SR_OUT = 10
+    g_sr = ShiftRegister(SR_CLOCK, SR_LATCH, SR_OUT)
 
     # Connect to WiFi
     wifi_connect(disconnect=False)
@@ -510,6 +519,24 @@ def cycle_all_leds(delay_in_seconds=0.3, blink=True):
     for btn in LED_BUTTONS:
         cycle_led(btn, delay_in_seconds, blink)
 
+BUTTON_A = 1
+BUTTON_B = 2
+BUTTON_C = 4
+BUTTON_D = 8
+BUTTON_E = 16
+
+def read_bttns():
+    """
+       Read the button presses from the ShiftRegister and return them as a mask ie powers of two to allow for multiple button press events.
+       result = BUTTON_E | BUTTON_A i.e. 17
+    """
+    global g_sr
+    if on_pc:
+        return 0
+
+    g_sr.read()
+    return (BUTTON_A * g_sr[7]) | (BUTTON_B * g_sr[6]) | (BUTTON_C * g_sr[5]) | (BUTTON_D * g_sr[4]) | (BUTTON_E * g_sr[3])
+
 #############
 # Main Loop #
 #############
@@ -519,36 +546,44 @@ def main_loop():
     cycle_all_leds()
 
     while True:
-        # Step 0: Handle Buttons 
-        if inky_frame.button_a.read():
+        # Step 1: Check for button presses
+        bttn_mask = read_bttns()
+
+        # Step 2: Handle Button Events
+        if bttn_mask & BUTTON_A:
             # Increment to the next picture
+            log_debug("main", "button Aa was pressed."
             g_idx_offset += 1
-        elif inky_frame.button_b.read():
+        elif bttn_mask & BUTTON_B:
             # Increment a random next picture
+            log_debug("main", "button B was pressed."
             img_cnt = max(len(list_images()) - 1, 0)
             g_idx_offset += random.randint(0, img_cnt)
             #g_idx_offset += random.randrange(len(list_images()))
-        elif inky_frame.button_c.read():
+        elif bttn_mask & BUTTON_C:
+            log_debug("main", "button C was pressed."
             pass 
-        elif inky_frame.button_d.read():
+        elif bttn_msk & BUTTON_D:
             # Attempt to reconnect to wifi
+            log_debug("main", "button D was pressed."
             wifi_connect(disconnect=True)
-        elif inky_frame.button_e.read():
+        elif bttn_msk & BUTTON_E:
             # Reset - delete images directory and attempt to redownload
+            log_debug("main", "button E was pressed."
             g_idx_offset = 0
             delete_sd_files_with_filter(set())
 
-        # Step 1: Cleanup old images and add new ones
+        # Step 3: Cleanup old images and add new ones
         json_body = load_json_body(JSON_MAP_URL)
         if json_body:
             process_json_body(json_body)
         else:
             log_warning("Unable to download new pictures due to failure of load_json_body")
 
-        # Step 2: Select which image to display
+        # Step 4: Select which image to display
         display_image_by_time()
 
-        # Step 3: Go to sleep
+        # Step 5: Go to sleep
         inky_frame.sleep_for(PERIOD_IN_MINUTES)
         #turn_off() shouldn't be necessary as the docs claim sleep_for handles this
         #inky_frame.turn_off()  
