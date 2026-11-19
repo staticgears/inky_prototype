@@ -295,8 +295,9 @@ def _display_jpeg(filename):
         screen_w, screen_h = g_graphics.get_bounds()
         # Choose a colour and uncomment these lines to choose a background colour
         # Colour options: BLACK, WHITE, GREEN, BLUE, RED, YELLOW, ORANGE, TAUPE
-        #g_graphics.set_pen(inky_frame.WHITE)
-        #g_graphics.clear()
+        g_graphics.set_pen(inky_frame.BLACK)
+        g_graphics.clear()
+
         # TODO in the example this was a singleton, but that seems unncessary
         j = jpegdec.JPEG(g_graphics)
         j.open_file(path)
