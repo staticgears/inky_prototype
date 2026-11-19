@@ -606,7 +606,8 @@ def main_loop():
         display_image_by_time()
 
         # Step 5: Go to sleep
-        inky_frame.sleep_for(PERIOD_IN_MINUTES)
+        time.sleep(3)
+        #inky_frame.sleep_for(PERIOD_IN_MINUTES)
         #turn_off() shouldn't be necessary as the docs claim sleep_for handles this
         #inky_frame.turn_off()  
 
