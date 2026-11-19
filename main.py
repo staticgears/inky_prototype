@@ -1,4 +1,4 @@
-emport gc, json, network, os, random, time
+import gc, json, network, os, random, time
 import inky_frame
 import jpegdec
 from machine import RTC
