@@ -522,21 +522,14 @@ def main_loop():
     blink_cnt=3
 
     while True:
-        is_woken_by_bttn = inky_frame.woken_by_button()
-        is_woken_by_rtc = inky_frame.woken_by_button()
-        log_debug("main", f"start of loop inky_frame.woken bttn: {is_woken_by_bttn} rtc: {is_woken_by_rtc}")
-
-        # Avoid running code unless we've been triggered by an event
-        # Keeps this example from locking up Thonny when we want to tweak the code
-        if not(inky_frame.woken_by_rtc() or inky_frame.woken_by_button()):
-            log_debug("main", "Not woken up by rtc or button press")
-            inky_frame.sleep_for(PERIOD_IN_MINUTES)
-            continue
+        #is_woken_by_bttn = inky_frame.woken_by_button()
+        #is_woken_by_rtc = inky_frame.woken_by_button()
+        #log_debug("main", f"start of loop inky_frame.woken bttn: {is_woken_by_bttn} rtc: {is_woken_by_rtc}")
 
         # Step 2: Handle Button Events
         if inky_frame.button_a.read():
             # Increment to the next picture
-            log_debug("main", "button A was pressed.\n\n\n\n\n\n\n---------------------------------\nWOW!!!!!!!!!!!!!!!!!!!")
+            log_debug("main", "button A was pressed.")
             blink_led(inky_frame.button_a, times=blink_cnt)
             g_idx_offset += 1
         elif inky_frame.button_b.read():
@@ -563,16 +556,15 @@ def main_loop():
             g_idx_offset = 0
             delete_sd_files_with_filter(set())
 
-        if inky_frame.woken_by_rtc():
-            # Step 3: Cleanup old images and add new ones
-            json_body = load_json_body(JSON_MAP_URL)
-            if json_body:
-                process_json_body(json_body)
-            else:
-                log_warning("Unable to download new pictures due to failure of load_json_body")
+        # Step 3: Cleanup old images and add new ones
+        json_body = load_json_body(JSON_MAP_URL)
+        if json_body:
+            process_json_body(json_body)
+        else:
+            log_warning("Unable to download new pictures due to failure of load_json_body")
 
-            # Step 4: Select which image to display
-            display_image_by_time()
+        # Step 4: Select which image to display
+        display_image_by_time()
 
         # Step 5: Go to sleep
         log_debug("main", "Going to sleep now.")
