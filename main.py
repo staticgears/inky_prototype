@@ -1,4 +1,4 @@
-import gc, json, network, os, random, time
+emport gc, json, network, os, random, time
 import inky_frame
 import jpegdec
 from machine import RTC
@@ -123,7 +123,6 @@ def parse_config(filepath: str) -> dict[str, str]:
 # Graphics initialization #
 ###########################
 g_graphics = None
-g_sr = None
 def graphics_init():
     global g_graphics
     if not on_pc:
@@ -202,7 +201,6 @@ def wifi_connect(disconnect):
         log_debug('wifi_connect', 'Connection successful!')
 
 def hardware_init():
-    global g_sr
     makedirs(IMAGES_DIR)
     # Sync time
     inky_frame.pcf_to_pico_rtc() 
@@ -216,13 +214,6 @@ def hardware_init():
     i2c = PimoroniI2C(I2C_SDA_PIN, I2C_SCL_PIN, 100000)
     rtc = PCF85063A(i2c)
     rtc.enable_timer_interrupt(True)
-
-    from pimoroni import ShiftRegister
-    # Inky Frame uses a shift register to read the buttons
-    SR_CLOCK = 8
-    SR_LATCH = 9
-    SR_OUT = 10
-    g_sr = ShiftRegister(SR_CLOCK, SR_LATCH, SR_OUT)
 
     # Connect to WiFi
     wifi_connect(disconnect=False)
@@ -544,6 +535,14 @@ def read_bttns():
     result = g_sr.read()
     log_debug("read_bttns", "--------------------------------------------")
     print(result)
+    print(g_sr[7])
+    print(g_sr[6])
+    print(g_sr[5])
+    print(g_sr[4])
+    print(g_sr[3])
+    print(g_sr[2])
+    print(g_sr[1])
+    print(g_sr[0])
     log_debug("read_bttns", "--------------------------------------------")
     return (BUTTON_A * g_sr[7]) | (BUTTON_B * g_sr[6]) | (BUTTON_C * g_sr[5]) | (BUTTON_D * g_sr[4]) | (BUTTON_E * g_sr[3])
 
@@ -553,8 +552,8 @@ def read_bttns():
 def main_loop():
     global g_idx_offset
     hardware_init()
-    #reset_all_leds()
-    #cycle_all_leds()
+    reset_all_leds()
+    cycle_all_leds()
     blink_cnt=3
 
     while True:
@@ -565,37 +564,29 @@ def main_loop():
             inky_frame.sleep_for(PERIOD_IN_MINUTES)
             continue
 
-        # Step 1: Check for button presses
-        bttn_mask = read_bttns()
-        log_debug("main", f"BUTTONS ------------   bttn_mask read: {bttn_mask}")
-
-        if bttn_mask == 0:
-           time.sleep(3)
-           continue
-
         # Step 2: Handle Button Events
-        if bttn_mask & BUTTON_A:
+        if inky_frame.button_a.read():
             # Increment to the next picture
-            log_debug("main", "button A was pressed.")
+            log_debug("main", "button A was pressed.\n\n\n\n\n\n\n---------------------------------\nWOW!!!!!!!!!!!!!!!!!!!")
             blink_led(inky_frame.button_a, times=blink_cnt)
             g_idx_offset += 1
-        elif bttn_mask & BUTTON_B:
+        elif inky_frame.button_b.read():
             # Increment a random next picture
             log_debug("main", "button B was pressed.")
             blink_led(inky_frame.button_b, times=blink_cnt)
             img_cnt = max(len(list_images()) - 1, 0)
             g_idx_offset += random.randint(0, img_cnt)
             #g_idx_offset += random.randrange(len(list_images()))
-        elif bttn_mask & BUTTON_C:
+        elif inky_frame.button_c.read():
             log_debug("main", "button C was pressed.")
             blink_led(inky_frame.button_c, times=blink_cnt)
             pass 
-        elif bttn_mask & BUTTON_D:
+        elif inky_frame.button_d.read():
             # Attempt to reconnect to wifi
             log_debug("main", "button D was pressed.")
             blink_led(inky_frame.button_d, times=blink_cnt)
             wifi_connect(disconnect=True)
-        elif bttn_mask & BUTTON_E:
+        elif inky_frame.button_e.read():
             # Reset - delete images directory and attempt to redownload
             log_debug("main", "button E was pressed.")
             blink_led(inky_frame.button_e, times=blink_cnt)
@@ -613,8 +604,7 @@ def main_loop():
         display_image_by_time()
 
         # Step 5: Go to sleep
-        time.sleep(3)
-        #inky_frame.sleep_for(PERIOD_IN_MINUTES)
+        inky_frame.sleep_for(PERIOD_IN_MINUTES)
         #turn_off() shouldn't be necessary as the docs claim sleep_for handles this
         #inky_frame.turn_off()  
 
