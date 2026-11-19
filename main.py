@@ -586,7 +586,7 @@ def main_loop():
         elif inky_frame.button_c.read():
             log_debug("main", "button C was pressed.")
             blink_led(inky_frame.button_c, times=blink_cnt)
-            rais Exception("Intentional crash')
+            raise Exception("Intentional crash')
             pass 
         elif inky_frame.button_d.read():
             # Attempt to reconnect to wifi
