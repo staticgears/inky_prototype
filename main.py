@@ -205,16 +205,6 @@ def hardware_init():
     # Sync time
     inky_frame.pcf_to_pico_rtc() 
 
-    # TODO This part may not be needed, seen in https://github.com/pimoroni/inky-frame/blob/main/examples/inky_frame_news.py
-    # intialise the pcf85063a real time clock chip
-    from pimoroni_i2c import PimoroniI2C
-    from pcf85063a import PCF85063A
-    I2C_SDA_PIN = 4
-    I2C_SCL_PIN = 5
-    i2c = PimoroniI2C(I2C_SDA_PIN, I2C_SCL_PIN, 100000)
-    rtc = PCF85063A(i2c)
-    rtc.enable_timer_interrupt(True)
-
     # Connect to WiFi
     wifi_connect(disconnect=False)
  
@@ -517,35 +507,6 @@ def cycle_all_leds(delay_in_seconds=0.3, blink=True):
     for btn in LED_BUTTONS:
         blink_led(btn, delay_in_seconds, times=1)
 
-BUTTON_A = 1
-BUTTON_B = 2
-BUTTON_C = 4
-BUTTON_D = 8
-BUTTON_E = 16
-
-def read_bttns():
-    """
-       Read the button presses from the ShiftRegister and return them as a mask ie powers of two to allow for multiple button press events.
-       result = BUTTON_E | BUTTON_A i.e. 17
-    """
-    global g_sr
-    if on_pc:
-        return 0
-
-    result = g_sr.read()
-    log_debug("read_bttns", "--------------------------------------------")
-    print(result)
-    print(g_sr[7])
-    print(g_sr[6])
-    print(g_sr[5])
-    print(g_sr[4])
-    print(g_sr[3])
-    print(g_sr[2])
-    print(g_sr[1])
-    print(g_sr[0])
-    log_debug("read_bttns", "--------------------------------------------")
-    return (BUTTON_A * g_sr[7]) | (BUTTON_B * g_sr[6]) | (BUTTON_C * g_sr[5]) | (BUTTON_D * g_sr[4]) | (BUTTON_E * g_sr[3])
-
 #############
 # Main Loop #
 #############
@@ -567,8 +528,6 @@ def main_loop():
             log_debug("main", "Not woken up by rtc or button press")
             inky_frame.sleep_for(PERIOD_IN_MINUTES)
             continue
-
-        log_debug("main", "Not woken up by rtc or button press")
 
         # Step 2: Handle Button Events
         if inky_frame.button_a.read():
@@ -612,7 +571,9 @@ def main_loop():
             display_image_by_time()
 
         # Step 5: Go to sleep
+        log_debug("main", "Going to sleep now.")
         inky_frame.sleep_for(PERIOD_IN_MINUTES)
+
         #turn_off() shouldn't be necessary as the docs claim sleep_for handles this
         #inky_frame.turn_off()  
 
