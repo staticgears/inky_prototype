@@ -315,7 +315,7 @@ def display_image_by_time():
        HOUR_LOWER_BOUND + HOUR_UPPER_BOUND configure the waking hours 0 -23 inclusive
        In combinatio nwith an number of hours since the begining of the month, we module against hte number of aivlable images
     """
-    global g_idx
+    global g_idx_offset
     monthly_hour_epoc = 0
     year, _, _, days, hours, _, _, _ = RTC().datetime()
     if year < 2023:
@@ -542,7 +542,7 @@ def read_bttns():
 # Main Loop #
 #############
 def main_loop():
-    global g_idx
+    global g_idx_offset
     hardware_init()
     reset_all_leds()
     cycle_all_leds()
@@ -554,7 +554,7 @@ def main_loop():
         # Step 2: Handle Button Events
         if bttn_mask & BUTTON_A:
             # Increment to the next picture
-            log_debug("main", "button Aa was pressed."
+            log_debug("main", "button A was pressed."
             g_idx_offset += 1
         elif bttn_mask & BUTTON_B:
             # Increment a random next picture
