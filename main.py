@@ -494,13 +494,17 @@ def reset_all_leds():
     for btn in LED_BUTTONS:
         btn.led_off()
 
-def cycle_led(btn, delay_in_seconds=0.3, blink=True):
-    _blink_delay_in_seconds = 0.1
+def blink_led(btn, delay_in_seconds=0.3, times=1):
+    """
+        Aassumes led is in the off position, failing this it jsut stays one for delay_in_seconds and then goes off.
+        LED is always left in the off state afterwards.
+        Execution takes 2 X delay_in_seconds X times
+    """
     btn.led_on()
-    if blink:
-        time.sleep(_blink_delay_in_seconds)
+    for _ in range(times-1):
+        time.sleep(delay_in_seconds)
         btn.led_toggle()
-        time.sleep(_blink_delay_in_seconds)
+        time.sleep(delay_in_seconds)
         btn.led_toggle()
     time.sleep(delay_in_seconds)
     btn.led_toggle()
@@ -509,7 +513,7 @@ def cycle_led(btn, delay_in_seconds=0.3, blink=True):
 def cycle_all_leds(delay_in_seconds=0.3, blink=True):
     """ Cycle through each button, this takes 5x delay_in_seconds + 10x _blink_delay_in_seconds if blink is enabled """
     for btn in LED_BUTTONS:
-        cycle_led(btn, delay_in_seconds, blink)
+        blink_led(btn, delay_in_seconds, times=1)
 
 #############
 # Main Loop #
@@ -519,29 +523,35 @@ def main_loop():
     hardware_init()
     reset_all_leds()
     cycle_all_leds()
+    blink_cnt=3
 
     while True:
         # Step 0: Handle Buttons 
         if inky_frame.button_a.read():
             # Increment to the next picture
             log_debug("main", "button A was pressed."
+            blink_led(inky_frame.button_a, times=blink_cnt)
             g_idx_offset += 1
         elif inky_frame.button_b.read():
             # Increment a random next picture
             log_debug("main", "button B was pressed."
+            blink_led(inky_frame.button_b, times=blink_cnt)
             img_cnt = max(len(list_images()) - 1, 0)
             g_idx_offset += random.randint(0, img_cnt)
             #g_idx_offset += random.randrange(len(list_images()))
         elif inky_frame.button_c.read():
             log_debug("main", "button C was pressed."
+            blink_led(inky_frame.button_c, times=blink_cnt)
             pass 
         elif inky_frame.button_d.read():
             # Attempt to reconnect to wifi
             log_debug("main", "button D was pressed."
+            blink_led(inky_frame.button_d, times=blink_cnt)
             wifi_connect(disconnect=True)
         elif inky_frame.button_e.read():
             # Reset - delete images directory and attempt to redownload
             log_debug("main", "button E was pressed."
+            blink_led(inky_frame.button_e, times=blink_cnt)
             g_idx_offset = 0
             delete_sd_files_with_filter(set())
 
