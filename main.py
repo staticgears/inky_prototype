@@ -271,6 +271,10 @@ def _display_jpeg(filename):
         return
     path = _get_image_path(filename)
     log_debug("_display_jpeg", f"loading image at path = {path} ...")
+    if not file_exists(path):
+        log_warning(f"Now image found, may resolve itself in a few minutes, {path}...")
+        return
+    
     try:
         gc.collect()
         screen_w, screen_h = g_graphics.get_bounds()
@@ -287,10 +291,10 @@ def _display_jpeg(filename):
         y_offset = max(0, (screen_h - j.get_height()) // 2)
         j.decode(x_offset, y_offset, jpegdec.JPEG_SCALE_FULL)
         g_graphics.update()
+        log_debug("_display_jpeg", "Successfully loaded image.")
     except Exception as e:
         log_error(f"CRITICAL :: An error occurred displaying image: {e}")
-        raise e
-    log_debug("_display_jpeg", "Successfully loaded image.")
+        delete_image(filename)
 
 def display_image_by_time():
     """
