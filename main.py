@@ -315,6 +315,7 @@ def display_image_by_time():
        HOUR_LOWER_BOUND + HOUR_UPPER_BOUND configure the waking hours 0 -23 inclusive
        In combinatio nwith an number of hours since the begining of the month, we module against hte number of aivlable images
     """
+    global g_idx
     monthly_hour_epoc = 0
     year, _, _, days, hours, _, _, _ = RTC().datetime()
     if year < 2023:
@@ -541,6 +542,7 @@ def read_bttns():
 # Main Loop #
 #############
 def main_loop():
+    global g_idx
     hardware_init()
     reset_all_leds()
     cycle_all_leds()
