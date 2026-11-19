@@ -541,7 +541,10 @@ def read_bttns():
     if on_pc:
         return 0
 
-    g_sr.read()
+    result = g_sr.read()
+    log_debug("read_bttns", "--------------------------------------------")
+    print(result)
+    log_debug("read_bttns", "--------------------------------------------")
     return (BUTTON_A * g_sr[7]) | (BUTTON_B * g_sr[6]) | (BUTTON_C * g_sr[5]) | (BUTTON_D * g_sr[4]) | (BUTTON_E * g_sr[3])
 
 #############
@@ -565,6 +568,10 @@ def main_loop():
         # Step 1: Check for button presses
         bttn_mask = read_bttns()
         log_debug("main", f"BUTTONS ------------   bttn_mask read: {bttn_mask}")
+
+        if bttn_mask == 0:
+           time.sleep(3)
+           continue
 
         # Step 2: Handle Button Events
         if bttn_mask & BUTTON_A:
