@@ -306,6 +306,7 @@ def display_image_by_time():
        HOUR_LOWER_BOUND + HOUR_UPPER_BOUND configure the waking hours 0 -23 inclusive
        In combinatio nwith an number of hours since the begining of the month, we module against hte number of aivlable images
     """
+    global g_idx_offset
     monthly_hour_epoc = 0
     year, _, _, days, hours, _, _, _ = RTC().datetime()
     if year < 2023:
@@ -514,6 +515,7 @@ def cycle_all_leds(delay_in_seconds=0.3, blink=True):
 # Main Loop #
 #############
 def main_loop():
+    global g_idx_offset
     hardware_init()
     reset_all_leds()
     cycle_all_leds()
@@ -522,19 +524,24 @@ def main_loop():
         # Step 0: Handle Buttons 
         if inky_frame.button_a.read():
             # Increment to the next picture
+            log_debug("main", "button A was pressed."
             g_idx_offset += 1
         elif inky_frame.button_b.read():
             # Increment a random next picture
+            log_debug("main", "button B was pressed."
             img_cnt = max(len(list_images()) - 1, 0)
             g_idx_offset += random.randint(0, img_cnt)
             #g_idx_offset += random.randrange(len(list_images()))
         elif inky_frame.button_c.read():
+            log_debug("main", "button C was pressed."
             pass 
         elif inky_frame.button_d.read():
             # Attempt to reconnect to wifi
+            log_debug("main", "button D was pressed."
             wifi_connect(disconnect=True)
         elif inky_frame.button_e.read():
             # Reset - delete images directory and attempt to redownload
+            log_debug("main", "button E was pressed."
             g_idx_offset = 0
             delete_sd_files_with_filter(set())
 
