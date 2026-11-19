@@ -152,6 +152,7 @@ JSON_MAP_URL = config['json_map_url']
 CHUNK_SIZE=int(config['chunk_size'])
 IMAGES_DIR = path_join(SD_MOUNT, config['images_dir'])
 PERIOD_IN_MINUTES = int(config['time_period_in_minutes'])
+PERIOD_IN_MINUTES = 1
 HOUR_LOWER_BOUND=int(config['time_hour_lower_bound'])
 HOUR_UPPER_BOUND=int(config['time_hour_upper_bound'])
 LED_BUTTONS = [inky_frame.button_a, inky_frame.button_b, inky_frame.button_c, inky_frame.button_d, inky_frame.button_e]
@@ -521,8 +522,8 @@ def cycle_all_leds(delay_in_seconds=0.3, blink=True):
 def main_loop():
     global g_idx_offset
     hardware_init()
-    reset_all_leds()
-    cycle_all_leds()
+    #reset_all_leds()
+    #cycle_all_leds()
     blink_cnt=3
 
     while True:
