@@ -541,7 +541,9 @@ def read_bttns():
     if on_pc:
         return 0
 
+    log_debug("read_bttns", "attmepting to read ...........................")
     g_sr.read()
+    print(g_sr)
     return (BUTTON_A * g_sr[7]) | (BUTTON_B * g_sr[6]) | (BUTTON_C * g_sr[5]) | (BUTTON_D * g_sr[4]) | (BUTTON_E * g_sr[3])
 
 #############
