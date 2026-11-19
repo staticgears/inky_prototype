@@ -317,26 +317,26 @@ def display_image_by_time():
        In combinatio nwith an number of hours since the begining of the month, we module against hte number of aivlable images
     """
     global g_idx_offset
-    monthly_hour_epoc = 0
-    year, _, _, days, hours, _, _, _ = RTC().datetime()
+    monthly_minute_epoc = 0
+    year, _, _, days, hours, minutes, _, _ = RTC().datetime()
     if year < 2023:
       # Connect to network
        inky_frame.set_time()  # Sets both the Inky and Pico RTC
  
     if hours < HOUR_LOWER_BOUND:
-       monthly_hour_epoc = 0 
+       monthly_minute_epoc = 0
     elif hours > HOUR_UPPER_BOUND:
-       monthly_hour_epoc = HOUR_UPPER_BOUND
+       monthly_minute_epoc = HOUR_UPPER_BOUND*60
     else:
-       monthly_hour_epoc = hours
+       monthly_minute_epoc = hours*60 + minutes
 
     if days > 0:
-       monthly_hour_epoc += (days - 1)*24
+       monthly_minute_epoc += (days - 1)*24*60
     sorted_paths = sorted(list_images())
     if len(sorted_paths) == 0:
        log_warning("No images to display")
        return
-    idx = (monthly_hour_epoc + g_idx_offset) % len(sorted_paths)
+    idx = ((monthly_minute_epoc // PERIOD_IN_MINUTES) + g_idx_offset) % len(sorted_paths)
     filename = sorted_paths[idx]
     log_debug("display_image_by_time", f"filename = {filename}")
     _display_jpeg(filename)
@@ -554,6 +554,13 @@ def main_loop():
     blink_cnt=3
 
     while True:
+        # Avoid running code unless we've been triggered by an event
+        # Keeps this example from locking up Thonny when we want to tweak the code
+        if not(inky_frame.woken_by_rtc() or inky_frame.woken_by_button()):
+            log_debug("main", "Not woken up by rtc or button press")
+            inky_frame.sleep_for(PERIOD_IN_MINUTES)
+            continue
+
         # Step 1: Check for button presses
         bttn_mask = read_bttns()
 
