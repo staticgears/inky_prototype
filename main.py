@@ -219,14 +219,17 @@ def wifi_connect(disconnect):
         raise RuntimeError('Failed to establish a network connection')
     else:
         log_debug('wifi_connect', 'Connection successful!')
+        inky_frame.set_time()
+        log_debug("main", "Logging after ntp time sync.")
 
 def hardware_init():
     makedirs(IMAGES_DIR)
-    # Sync time
-    inky_frame.pcf_to_pico_rtc() 
 
     # Connect to WiFi
     wifi_connect(disconnect=False)
+
+    # Sync time
+    inky_frame.pcf_to_pico_rtc()
  
 ###########
 # Logging #
@@ -364,7 +367,6 @@ def display_image_by_time_rotation():
     monthly_minute_epoc = 0
     year, _, _, days, hours, minutes, _, _ = RTC().datetime()
     if year < 2023:
-      # Connect to network
        inky_frame.set_time()  # Sets both the Inky and Pico RTC
        year, _, _, days, hours, minutes, _, _ = RTC().datetime()
  
@@ -606,8 +608,6 @@ def main_loop():
             log_debug("main", "button D was pressed.")
             blink_led(inky_frame.button_d, times=blink_cnt)
             wifi_connect(disconnect=True)
-            inky_frame.set_time()
-            log_debug("main", "Logging after ntp time sync.")
         elif g_bttn_event & BUTTON_E:
             # Reset - delete images directory and attempt to redownload
             log_debug("main", "button E was pressed.")
