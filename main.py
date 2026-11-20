@@ -1,5 +1,24 @@
-import gc, json, network, os, random, time
 import inky_frame
+
+BUTTON_A = 1
+BUTTON_B = 2
+BUTTON_C = 4
+BUTTON_D = 8
+BUTTON_E = 16
+
+# Check which button is still held down right at boot because evidently if you delay this information can be lost
+g_bttn_event = 0
+if inky_frame.woken_by_button():
+    # Check which button is still held down right at boot
+    g_bttn_event = (
+        (BUTTON_A * inky_frame.button_a.raw())
+        | (BUTTON_B * inky_frame.button_b.raw())
+        | (BUTTON_C * inky_frame.button_c.raw())
+        | (BUTTON_D * inky_frame.button_d.raw())
+        | (BUTTON_E * inky_frame.button_e.raw())
+    )
+
+import gc, json, network, os, random, time
 import jpegdec
 from machine import RTC
 
@@ -9,7 +28,8 @@ DEBUG=1
 def log_debug(ctxt, msg):
     global DEBUG
     if DEBUG:
-        print(f"DEBUG :: {ctxt} -> {msg}")
+        _, _, _, _, hours, minutes, seconds, _ = RTC().datetime()
+        print(f"DEBUG :: [{hours}:{minutes}:{seconds}] {ctxt} -> {msg}")
 
 on_pc = False
 try:
@@ -234,6 +254,30 @@ def check_existence_of_image(filename):
 def list_images():
     return os.listdir(IMAGES_DIR)
 
+def _get_most_recent_image_filename():
+    """
+       Return the filename of the most recently modified image or None if the IMAGES_DIR is empty.
+       Note: if multiple were downloaded in the same chunk the order is indeterminate.
+    """
+    latest_filename = None
+    latest_mtime = -1
+
+    for entry in os.ilistdir(IMAGES_DIR):
+        filename = entry[0]
+        type = entry[1]
+
+        # 0x8000 is the standard MicroPython bitmask for a regular file (ignores folders)
+        if type == 0x8000:
+            path = _get_image_path(filename)
+            # Index 8 in os.stat() is st_mtime (modification time)
+            mtime = os.stat(path)[8]
+
+            if mtime > latest_mtime:
+                latest_mtime = mtime
+                latest_filename = filename
+
+    return latest_filename
+
 def delete_image(filename):
     #TODO does deleting a displayed image require special handling, for now I'm assuming not
     try:
@@ -296,7 +340,21 @@ def _display_jpeg(filename):
         log_error(f"CRITICAL :: An error occurred displaying image: {e}")
         delete_image(filename)
 
-def display_image_by_time():
+def display_image_by_recency():
+    """
+       Unlike display_image_by_time_rotation, this method attempt to find the most recently downloaded image and display it.
+       This lasts until the next time window's rotation at which time things will revert to display_image_by_time_rotation.
+       This is intended as a manual overrride to kind of say, look what I sent you.
+    """
+    filename = _get_most_recent_image_filename()
+    if filename:
+        log_debug("display_image_by_recency", f"filename = {filename}")
+        _display_jpeg(filename)
+    else:
+       log_warning("No images to display inside of display_image_by_recency")
+       return
+
+def display_image_by_time_rotation():
     """
        The goal is to rotate an image based on teh hour, but avoid certain images only displaying during night time.
        HOUR_LOWER_BOUND + HOUR_UPPER_BOUND configure the waking hours 0 -23 inclusive
@@ -308,6 +366,7 @@ def display_image_by_time():
     if year < 2023:
       # Connect to network
        inky_frame.set_time()  # Sets both the Inky and Pico RTC
+       year, _, _, days, hours, minutes, _, _ = RTC().datetime()
  
     if hours < HOUR_LOWER_BOUND:
        monthly_minute_epoc = 0
@@ -320,11 +379,11 @@ def display_image_by_time():
        monthly_minute_epoc += (days - 1)*24*60
     sorted_paths = sorted(list_images())
     if len(sorted_paths) == 0:
-       log_warning("No images to display")
+       log_warning("No images to display inside of display_image_by_time_rotation")
        return
     idx = ((monthly_minute_epoc // PERIOD_IN_MINUTES) + g_idx_offset) % len(sorted_paths)
     filename = sorted_paths[idx]
-    log_debug("display_image_by_time", f"filename = {filename}")
+    log_debug("display_image_by_time_rotation", f"filename = {filename}, idx={idx}, g_idx_offset={g_idx_offset}")
     _display_jpeg(filename)
 
 def _resolve_redirect_url(base_url, location):
@@ -515,64 +574,63 @@ def cycle_all_leds(delay_in_seconds=0.3, blink=True):
 # Main Loop #
 #############
 def main_loop():
-    global g_idx_offset
+    global g_idx_offset, g_bttn_event
     hardware_init()
     reset_all_leds()
     cycle_all_leds()
     blink_cnt=3
+    use_display_by_time_rotation=True
 
     while True:
-        #is_woken_by_bttn = inky_frame.woken_by_button()
-        #is_woken_by_rtc = inky_frame.woken_by_button()
-        #log_debug("main", f"start of loop inky_frame.woken bttn: {is_woken_by_bttn} rtc: {is_woken_by_rtc}")
-
-        # Step 2: Handle Button Events
-        if inky_frame.button_a.read():
+        # On each loop reset this to prevent getting stuck on teh most recent
+        use_display_by_time_rotation=True
+        # Step 1: Handle Button Events
+        if g_bttn_event & BUTTON_A:
             # Increment to the next picture
             log_debug("main", "button A was pressed.")
             blink_led(inky_frame.button_a, times=blink_cnt)
             g_idx_offset += 1
-        elif inky_frame.button_b.read():
+        elif g_bttn_event & BUTTON_B:
             # Increment a random next picture
             log_debug("main", "button B was pressed.")
             blink_led(inky_frame.button_b, times=blink_cnt)
             img_cnt = max(len(list_images()) - 1, 0)
             g_idx_offset += random.randint(0, img_cnt)
             #g_idx_offset += random.randrange(len(list_images()))
-        elif inky_frame.button_c.read():
+        elif g_bttn_event & BUTTON_C:
             log_debug("main", "button C was pressed.")
             blink_led(inky_frame.button_c, times=blink_cnt)
-            raise Exception("Intentional crash")
-            pass 
-        elif inky_frame.button_d.read():
-            # Attempt to reconnect to wifi
+            use_display_by_time_rotation=False
+        elif g_bttn_event & BUTTON_D:
+            # Attempt to reconnect to wifi and resync clock
             log_debug("main", "button D was pressed.")
             blink_led(inky_frame.button_d, times=blink_cnt)
             wifi_connect(disconnect=True)
-        elif inky_frame.button_e.read():
+            inky_frame.set_time()
+            log_debug("main", "Logging after ntp time sync.")
+        elif g_bttn_event & BUTTON_E:
             # Reset - delete images directory and attempt to redownload
             log_debug("main", "button E was pressed.")
             blink_led(inky_frame.button_e, times=blink_cnt)
             g_idx_offset = 0
             delete_sd_files_with_filter(set())
 
-        # Step 3: Cleanup old images and add new ones
+        # Step 2: Cleanup old images and add new ones
         json_body = load_json_body(JSON_MAP_URL)
         if json_body:
             process_json_body(json_body)
         else:
             log_warning("Unable to download new pictures due to failure of load_json_body")
 
-        # Step 4: Select which image to display
-        display_image_by_time()
+        # Step 3: Select which image to display
+        if use_display_by_time_rotation:
+            display_image_by_time_rotation()
+        else:
+            display_image_by_recency()
 
-        # Step 5: Go to sleep
+        # Step 4: Go to sleep
         log_debug("main", "Going to sleep now.")
         inky_frame.sleep_for(PERIOD_IN_MINUTES)
-
-        #turn_off() shouldn't be necessary as the docs claim sleep_for handles this
-        #inky_frame.turn_off()  
-
 
 if __name__ == "__main__":
     """ See testbench.py for manual testing off the device. """
