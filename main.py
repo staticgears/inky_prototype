@@ -175,6 +175,7 @@ PERIOD_IN_MINUTES = int(config['time_period_in_minutes'])
 PERIOD_IN_MINUTES = 1
 HOUR_LOWER_BOUND=int(config['time_hour_lower_bound'])
 HOUR_UPPER_BOUND=int(config['time_hour_upper_bound'])
+TZ_OFFSET=int(config.get('time_tz_offset', '-8'))
 LED_BUTTONS = [inky_frame.button_a, inky_frame.button_b, inky_frame.button_c, inky_frame.button_d, inky_frame.button_e]
 LED_BUSY = inky_frame.led_busy 
 LED_WIFI = inky_frame.led_wifi
@@ -357,6 +358,13 @@ def display_image_by_recency():
        log_warning("No images to display inside of display_image_by_recency")
        return
 
+def tz_adjust(month, day, hour, tz_offset):
+    dst_adjusted_offset = tz_offset
+    dst_months = {3, 4, 5, 6, 7, 8, 9, 10, 11}
+    if month in dst_months and not ((month == 3 and day < 14) or (month == 11 and day >= 7)):
+        dst_adjusted_offset += 1
+    return (hour + dst_adjusted_offset + 24) % 24
+
 def display_image_by_time_rotation():
     """
        The goal is to rotate an image based on teh hour, but avoid certain images only displaying during night time.
@@ -365,11 +373,13 @@ def display_image_by_time_rotation():
     """
     global g_idx_offset
     monthly_minute_epoc = 0
-    year, _, _, days, hours, minutes, _, _ = RTC().datetime()
+    year, _, day, _, hours, minutes, _, _ = RTC().datetime()
     if year < 2023:
        inky_frame.set_time()  # Sets both the Inky and Pico RTC
-       year, _, _, days, hours, minutes, _, _ = RTC().datetime()
- 
+       year, _, day,_, hours, minutes, _, _ = RTC().datetime()
+
+    hours = tz_adjust(month, day, hours, TZ_OFFSET)
+
     if hours < HOUR_LOWER_BOUND:
        monthly_minute_epoc = 0
     elif hours > HOUR_UPPER_BOUND:
@@ -377,8 +387,7 @@ def display_image_by_time_rotation():
     else:
        monthly_minute_epoc = hours*60 + minutes
 
-    if days > 0:
-       monthly_minute_epoc += (days - 1)*24*60
+    monthly_minute_epoc += (day - 1)*24*60
     sorted_paths = sorted(list_images())
     if len(sorted_paths) == 0:
        log_warning("No images to display inside of display_image_by_time_rotation")
