@@ -590,46 +590,52 @@ def main_loop():
     reset_all_leds()
     cycle_all_leds()
     blink_cnt=3
-    use_display_by_time_rotation=True
-
     while True:
-        # On each loop reset this to prevent getting stuck on teh most recent
+        # On each loop reset these to prevent getting stuck on teh most recent
+        refresh_json_map = True
         use_display_by_time_rotation=True
+        img_cnt = len(list_images())
+
         # Step 1: Handle Button Events
         if g_bttn_event & BUTTON_A:
             # Increment to the next picture
             log_debug("main", "button A was pressed.")
             blink_led(inky_frame.button_a, times=blink_cnt)
             g_idx_offset += 1
+            refresh_json_map = (img_cnt == 0) # Only refresh if we have no images
         elif g_bttn_event & BUTTON_B:
             # Increment a random next picture
             log_debug("main", "button B was pressed.")
             blink_led(inky_frame.button_b, times=blink_cnt)
-            img_cnt = max(len(list_images()) - 1, 0)
-            g_idx_offset += random.randint(0, img_cnt)
-            #g_idx_offset += random.randrange(len(list_images()))
+            max_img_idx = max(img_cnt - 1, 0)
+            g_idx_offset += random.randint(0, max_img_idx)
+            #g_idx_offset += random.randrange(img_cnt)
+            refresh_json_map = (img_cnt == 0) # Only refresh if we have no images
         elif g_bttn_event & BUTTON_C:
             log_debug("main", "button C was pressed.")
             blink_led(inky_frame.button_c, times=blink_cnt)
             use_display_by_time_rotation=False
+            refresh_json_map = (img_cnt == 0) # Only refresh if we have no images
         elif g_bttn_event & BUTTON_D:
-            # Attempt to reconnect to wifi and resync clock
+            # Wakes up device from sleep and force a json_map_refresh
             log_debug("main", "button D was pressed.")
             blink_led(inky_frame.button_d, times=blink_cnt)
-            wifi_connect(disconnect=True)
+            refresh_json_map = True
         elif g_bttn_event & BUTTON_E:
             # Reset - delete images directory and attempt to redownload
             log_debug("main", "button E was pressed.")
             blink_led(inky_frame.button_e, times=blink_cnt)
             g_idx_offset = 0
             delete_sd_files_with_filter(set())
+            refresh_json_map = True
 
         # Step 2: Cleanup old images and add new ones
-        json_body = load_json_body(JSON_MAP_URL)
-        if json_body:
-            process_json_body(json_body)
-        else:
-            log_warning("Unable to download new pictures due to failure of load_json_body")
+        if refresh_json_map:
+            json_body = load_json_body(JSON_MAP_URL)
+            if json_body:
+                process_json_body(json_body)
+            else:
+                log_warning("Unable to download new pictures due to failure of load_json_body")
 
         # Step 3: Select which image to display
         if use_display_by_time_rotation:
