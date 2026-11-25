@@ -172,7 +172,6 @@ JSON_MAP_URL = config['json_map_url']
 CHUNK_SIZE=int(config['chunk_size'])
 IMAGES_DIR = path_join(SD_MOUNT, config['images_dir'])
 PERIOD_IN_MINUTES = int(config['time_period_in_minutes'])
-PERIOD_IN_MINUTES = 1
 HOUR_LOWER_BOUND=int(config['time_hour_lower_bound'])
 HOUR_UPPER_BOUND=int(config['time_hour_upper_bound'])
 TZ_OFFSET=int(config.get('time_tz_offset', '-8'))
@@ -365,13 +364,7 @@ def tz_adjust(month, day, hour, tz_offset):
         dst_adjusted_offset += 1
     return (hour + dst_adjusted_offset + 24) % 24
 
-def display_image_by_time_rotation():
-    """
-       The goal is to rotate an image based on teh hour, but avoid certain images only displaying during night time.
-       HOUR_LOWER_BOUND + HOUR_UPPER_BOUND configure the waking hours 0 -23 inclusive
-       In combinatio nwith an number of hours since the begining of the month, we module against hte number of aivlable images
-    """
-    global g_idx_offset
+def get_night_and_epoc():
     monthly_minute_epoc = 0
     year, month, day, _, hours, minutes, _, _ = RTC().datetime()
     if year < 2023:
@@ -379,15 +372,26 @@ def display_image_by_time_rotation():
        year, month, day,_, hours, minutes, _, _ = RTC().datetime()
 
     hours = tz_adjust(month, day, hours, TZ_OFFSET)
-
+    is_night = False
     if hours < HOUR_LOWER_BOUND:
        monthly_minute_epoc = 0
+       is_night = True
     elif hours > HOUR_UPPER_BOUND:
        monthly_minute_epoc = HOUR_UPPER_BOUND*60
+       is_night = True
     else:
        monthly_minute_epoc = hours*60 + minutes
 
     monthly_minute_epoc += (day - 1)*24*60
+    return (is_night, monthly_minute_epoc)
+
+def display_image_by_time_rotation(monthly_minute_epoc):
+    """
+       The goal is to rotate an image based on teh hour, but avoid certain images only displaying during night time.
+       HOUR_LOWER_BOUND + HOUR_UPPER_BOUND configure the waking hours 0 -23 inclusive
+       In combinatio nwith an number of hours since the begining of the month, we module against hte number of aivlable images
+    """
+    global g_idx_offset
     sorted_paths = sorted(list_images())
     if len(sorted_paths) == 0:
        log_warning("No images to display inside of display_image_by_time_rotation")
@@ -629,22 +633,24 @@ def main_loop():
             delete_sd_files_with_filter(set())
             refresh_json_map = True
 
-        # Step 2: Cleanup old images and add new ones
-        if refresh_json_map:
-            json_body = load_json_body(JSON_MAP_URL)
-            if json_body:
-                process_json_body(json_body)
-            else:
-                log_warning("Unable to download new pictures due to failure of load_json_body")
+        is_night, monthly_minute_epoc = get_night_and_epoc()
+        if not is_night:
+            # Step 2: Cleanup old images and add new ones
+            if refresh_json_map:
+                json_body = load_json_body(JSON_MAP_URL)
+                if json_body:
+                    process_json_body(json_body)
+                else:
+                    log_warning("Unable to download new pictures due to failure of load_json_body")
 
-        # Step 3: Select which image to display
-        if use_display_by_time_rotation:
-            display_image_by_time_rotation()
-        else:
-            display_image_by_recency()
+            # Step 3: Select which image to display
+            if use_display_by_time_rotation:
+                display_image_by_time_rotation()
+            else:
+                display_image_by_recency()
 
         # Step 4: Go to sleep
-        log_debug("main", "Going to sleep now.")
+        log_debug("main", f"Going to sleep now. is_night={is_night}, monthly_minute_epoc={monthly_minute_epoc}")
         inky_frame.sleep_for(PERIOD_IN_MINUTES)
 
 if __name__ == "__main__":
