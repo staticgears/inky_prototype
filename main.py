@@ -645,7 +645,7 @@ def main_loop():
 
             # Step 3: Select which image to display
             if use_display_by_time_rotation:
-                display_image_by_time_rotation()
+                display_image_by_time_rotation(monthly_minute_epoc)
             else:
                 display_image_by_recency()
 
