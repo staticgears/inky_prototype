@@ -373,10 +373,10 @@ def display_image_by_time_rotation():
     """
     global g_idx_offset
     monthly_minute_epoc = 0
-    year, _, day, _, hours, minutes, _, _ = RTC().datetime()
+    year, month, day, _, hours, minutes, _, _ = RTC().datetime()
     if year < 2023:
        inky_frame.set_time()  # Sets both the Inky and Pico RTC
-       year, _, day,_, hours, minutes, _, _ = RTC().datetime()
+       year, month, day,_, hours, minutes, _, _ = RTC().datetime()
 
     hours = tz_adjust(month, day, hours, TZ_OFFSET)
 
